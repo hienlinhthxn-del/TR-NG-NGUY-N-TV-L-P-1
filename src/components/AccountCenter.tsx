@@ -21,6 +21,7 @@ import {
   Clock,
   Trophy,
   Eye,
+  EyeOff,
   X,
   FilePlus2,
 } from 'lucide-react';
@@ -406,7 +407,9 @@ export function loadStoredAccounts(): UserAccount[] {
 
 export function loadActiveSession(): UserAccount | null {
   try {
-    const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
+    const raw =
+      localStorage.getItem(ACTIVE_SESSION_KEY) ||
+      sessionStorage.getItem(ACTIVE_SESSION_KEY);
     if (raw) return JSON.parse(raw);
   } catch {
     // ignore
@@ -414,12 +417,22 @@ export function loadActiveSession(): UserAccount | null {
   return null;
 }
 
-export function saveActiveSession(account: UserAccount | null) {
+export function saveActiveSession(
+  account: UserAccount | null,
+  remember = true
+) {
   try {
     if (account) {
-      localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(account));
+      if (remember) {
+        localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(account));
+        sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      } else {
+        sessionStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(account));
+        localStorage.removeItem(ACTIVE_SESSION_KEY);
+      }
     } else {
       localStorage.removeItem(ACTIVE_SESSION_KEY);
+      sessionStorage.removeItem(ACTIVE_SESSION_KEY);
     }
   } catch {
     // ignore
@@ -440,7 +453,7 @@ interface AccountCenterProps {
   examHistory: StudentAttemptRecord[];
   examBuilderNode?: React.ReactNode;
   initialTab?: AccountTabType;
-  onLoginSuccess: (account: UserAccount) => void;
+  onLoginSuccess: (account: UserAccount, remember?: boolean) => void;
   onRegisterSuccess: (
     account: UserAccount,
     keepCurrentSession?: boolean
@@ -502,6 +515,8 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   // Login Form State
   const [loginUsername, setLoginUsername] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
+  const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [notFoundUserQuery, setNotFoundUserQuery] = useState<string | null>(
     null
   );
@@ -789,7 +804,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
       return;
     }
 
-    onLoginSuccess(found);
+    onLoginSuccess(found, rememberMe);
     setEditFullName(found.fullName);
     setEditBirthDate(found.birthDate || '');
     setEditGrade(found.grade);
@@ -1217,247 +1232,312 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   }
 
   // ============================================================================
-  // CASE 2: LOGGED OUT VIEW (!currentUser) -> CHỈ HIỂN THỊ ĐĂNG NHẬP & ĐĂNG KÝ TÀI KHOẢN MỚI
-  // (Không hiển thị danh sách tài khoản của giáo viên hay các học sinh khác)
+  // CASE 2: LOGGED OUT VIEW (!currentUser) -> GIAO DIỆN ĐĂNG NHẬP TRẠNG NGUYÊN
   // ============================================================================
   if (!currentUser) {
     const activeGuestTab = authTab === 'register' ? 'register' : 'login';
 
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-teal-700 mb-1">
-                <ShieldCheck className="w-4 h-4" />
-                <span>CỔNG ĐĂNG NHẬP TRẠNG NGUYÊN TIẾNG VIỆT</span>
-              </div>
-              <h1 className="text-2xl font-display font-extrabold text-slate-900">
-                {activeGuestTab === 'login'
-                  ? 'Đăng nhập Tài khoản'
-                  : 'Tạo Tài khoản Học sinh Mới'}
-              </h1>
-              <p className="text-sm text-slate-600 mt-1">
-                Nhập Tên đăng nhập và Mật khẩu cá nhân của bạn để bắt đầu.
-              </p>
-            </div>
+      <div className="w-full flex items-center justify-center py-4 sm:py-8 px-3 sm:px-6">
+        <div className="relative w-full max-w-[980px] bg-white rounded-[28px] shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 border border-white/90">
+          {/* Subtle traditional corner flourishes */}
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 left-0 w-12 h-12 text-rose-300/80 z-20"
+            viewBox="0 0 48 48"
+            fill="none"
+          >
+            <path
+              d="M2 46V18C2 9.163 9.163 2 18 2H46"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            />
+            <path
+              d="M8 38V18C8 12.477 12.477 8 18 8H38"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 right-0 w-12 h-12 text-rose-300/80 z-20 scale-x-[-1]"
+            viewBox="0 0 48 48"
+            fill="none"
+          >
+            <path
+              d="M2 46V18C2 9.163 9.163 2 18 2H46"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            />
+            <path
+              d="M8 38V18C8 12.477 12.477 8 18 8H38"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 left-0 w-12 h-12 text-rose-300/80 z-20 scale-y-[-1]"
+            viewBox="0 0 48 48"
+            fill="none"
+          >
+            <path
+              d="M2 46V18C2 9.163 9.163 2 18 2H46"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            />
+            <path
+              d="M8 38V18C8 12.477 12.477 8 18 8H38"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 right-0 w-12 h-12 text-rose-300/80 z-20 scale-[-1]"
+            viewBox="0 0 48 48"
+            fill="none"
+          >
+            <path
+              d="M2 46V18C2 9.163 9.163 2 18 2H46"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            />
+            <path
+              d="M8 38V18C8 12.477 12.477 8 18 8H38"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
 
-            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => {
-                  clearFeedback();
-                  setAuthTab('login');
-                }}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
-                  activeGuestTab === 'login'
-                    ? 'bg-white text-teal-900 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <LogIn className="w-4 h-4" />
-                Đăng nhập
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  clearFeedback();
-                  setAuthTab('register');
-                }}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
-                  activeGuestTab === 'register'
-                    ? 'bg-white text-teal-900 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <UserPlus className="w-4 h-4" />
-                + Tạo tài khoản mới
-              </button>
+          {/* Left Column: Trạng Nguyên Illustrated Scene + Welcome Bubble */}
+          <div className="relative bg-[#FBE1B2] min-h-[300px] sm:min-h-[380px] md:min-h-[580px] flex items-end justify-center overflow-hidden">
+            <img
+              src="/assets/login_illustration.jpg"
+              alt="Minh họa Trạng Nguyên Tiếng Việt"
+              className="w-full h-full object-cover object-bottom select-none"
+            />
+
+            {/* Speech Bubble above Mascot */}
+            <div className="absolute top-6 left-5 sm:top-9 sm:left-6 max-w-[205px] sm:max-w-[225px] bg-white/95 backdrop-blur-xs rounded-2xl px-4 py-3 shadow-md border border-amber-100 text-center z-10">
+              <p className="text-xs sm:text-[13px] font-semibold text-slate-700 leading-snug">
+                Chào mừng bạn đến với cổng đăng nhập của{' '}
+                <strong className="text-[#B8252A]">
+                  Trạng Nguyên Tiếng Việt
+                </strong>{' '}
+                - Lớp 1A2
+              </p>
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/95 rotate-45 border-r border-b border-amber-100"
+              />
             </div>
           </div>
 
-          {errorMsg && (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-medium flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-                <span>{errorMsg}</span>
+          {/* Right Column: Clean Login / Register Form */}
+          <div className="bg-white px-6 py-8 sm:px-11 sm:py-12 flex flex-col justify-center">
+            <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-slate-900 text-center mb-6">
+              {activeGuestTab === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
+            </h1>
+
+            {errorMsg && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs sm:text-sm font-medium space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+                {notFoundUserQuery && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleStartRegisterFromQuery(notFoundUserQuery)
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#B8252A] hover:bg-[#9E1D22] text-white text-xs font-bold cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Tạo tài khoản &quot;{notFoundUserQuery}&quot; ngay →
+                  </button>
+                )}
               </div>
-              {notFoundUserQuery && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleStartRegisterFromQuery(notFoundUserQuery)
-                  }
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold cursor-pointer whitespace-nowrap shrink-0"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  Tạo tài khoản "{notFoundUserQuery}" ngay →
-                </button>
-              )}
-            </div>
-          )}
+            )}
 
-          {successMsg && (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-sm font-semibold flex items-center gap-2.5">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>{successMsg}</span>
-            </div>
-          )}
+            {successMsg && (
+              <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs sm:text-sm font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+            )}
 
-          {activeGuestTab === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Tên đăng nhập
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+            {activeGuestTab === 'login' ? (
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="rounded-full bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-5 py-2">
+                  <label className="block text-[11px] font-medium text-slate-500 leading-tight">
+                    Tên đăng nhập
+                  </label>
                   <input
                     type="text"
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
-                    placeholder="Nhập tên đăng nhập của bạn..."
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
+                    placeholder="Nhập tên đăng nhập..."
+                    className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none placeholder:text-slate-400 placeholder:font-normal"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Mật khẩu
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <div className="rounded-full bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-5 py-3 flex items-center gap-2">
                   <input
-                    type="password"
+                    type={showLoginPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu..."
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
+                    placeholder="Mật khẩu"
+                    className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none placeholder:text-slate-500 placeholder:font-normal"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword((prev) => !prev)}
+                    className="text-slate-500 hover:text-slate-800 cursor-pointer shrink-0"
+                    aria-label={
+                      showLoginPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
+                    }
+                  >
+                    {showLoginPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-end pt-2">
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold transition-colors cursor-pointer"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Đăng nhập
-                </button>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-amber-50/70 border border-amber-200/80 p-4 rounded-xl">
-                <div className="text-xs sm:text-sm text-slate-700">
-                  <strong>Chưa có tài khoản?</strong> Nếu em chưa có tài khoản,
-                  hãy nhấn nút bên cạnh để đăng ký mới ngay!
+                <div className="pt-0.5 pb-1">
+                  <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded accent-[#4B5563] cursor-pointer"
+                    />
+                    <span className="text-sm font-medium text-slate-700">
+                      Ghi nhớ đăng nhập
+                    </span>
+                  </label>
                 </div>
+
+                <div className="space-y-3 pt-1">
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 rounded-full bg-[#B8252A] hover:bg-[#9E1D22] text-white text-base font-bold transition-colors cursor-pointer shadow-xs"
+                  >
+                    Đăng nhập
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleStartRegisterFromQuery(loginUsername)}
+                    className="w-full py-3 rounded-full bg-white hover:bg-rose-50 text-[#B8252A] border-2 border-[#B8252A] text-base font-bold transition-colors cursor-pointer"
+                  >
+                    Tạo tài khoản
+                  </button>
+                </div>
+
+                <div className="relative py-2 flex items-center justify-center">
+                  <div className="w-full border-t border-slate-200" />
+                  <span className="px-3 bg-white text-xs font-medium text-slate-500 whitespace-nowrap">
+                    Hoặc
+                  </span>
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => handleStartRegisterFromQuery(loginUsername)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer whitespace-nowrap shrink-0"
+                  onClick={onGoToExam}
+                  className="w-full py-2 inline-flex items-center justify-center gap-2 text-sm font-bold text-[#B8252A] hover:underline cursor-pointer"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  Tạo tài khoản mới
+                  <Play className="w-4 h-4" />
+                  Vào luyện thi ngay (Chế độ Khách)
                 </button>
-              </div>
-            </form>
-          ) : (
-            <form
-              onSubmit={(e) => handleRegisterSubmit(e, false)}
-              className="space-y-5"
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    1. Họ và tên học sinh *
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              </form>
+            ) : (
+              <form
+                onSubmit={(e) => handleRegisterSubmit(e, false)}
+                className="space-y-3.5"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-4 py-2">
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      Họ và tên học sinh *
+                    </label>
                     <input
                       type="text"
                       value={regFullName}
                       onChange={(e) =>
                         handleFullNameChangeInRegister(e.target.value)
                       }
-                      placeholder="Ví dụ: Lò Văn Minh"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-600"
+                      placeholder="VD: Lò Văn Minh"
+                      className="w-full bg-transparent text-sm font-semibold text-slate-900 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700">
-                      2. Tên đăng nhập *
-                    </label>
-                    {regFullName.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUsernameManuallyEdited(false);
-                          setRegUsername(
-                            suggestUsernameFromFullName(regFullName)
-                          );
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:underline cursor-pointer"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Gợi ý tự động
-                      </button>
-                    )}
+                  <div className="rounded-2xl bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-4 py-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-medium text-slate-500">
+                        Tên đăng nhập *
+                      </label>
+                      {regFullName.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsernameManuallyEdited(false);
+                            setRegUsername(
+                              suggestUsernameFromFullName(regFullName)
+                            );
+                          }}
+                          className="text-[10px] font-bold text-[#B8252A] hover:underline cursor-pointer"
+                        >
+                          Gợi ý
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={regUsername}
+                      onChange={(e) => {
+                        setUsernameManuallyEdited(true);
+                        setRegUsername(e.target.value);
+                      }}
+                      placeholder="vanminhtuachua"
+                      className="w-full bg-transparent text-sm font-mono font-bold text-slate-900 focus:outline-none"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={regUsername}
-                    onChange={(e) => {
-                      setUsernameManuallyEdited(true);
-                      setRegUsername(e.target.value);
-                    }}
-                    placeholder="Ví dụ: vanminhtuachua"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono font-bold text-teal-900 bg-teal-50/40 focus:outline-none focus:border-teal-600"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    3. Ngày sinh (DD/MM/YYYY)
-                  </label>
-                  <div className="relative">
-                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <div className="rounded-2xl bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-4 py-2">
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      Ngày sinh (DD/MM/YYYY)
+                    </label>
                     <input
                       type="text"
                       value={regBirthDate}
                       onChange={(e) => setRegBirthDate(e.target.value)}
-                      placeholder="Ví dụ: 15/08/2020"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
+                      placeholder="15/08/2020"
+                      className="w-full bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    4. Khối / Lớp *
-                  </label>
-                  <div className="relative">
-                    <GraduationCap className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <div className="rounded-2xl bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-4 py-2">
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      Khối / Lớp *
+                    </label>
                     <input
                       type="text"
                       value={regGrade}
                       onChange={(e) => setRegGrade(e.target.value)}
-                      placeholder="Ví dụ: Lớp 1A2"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
+                      placeholder="Lớp 1A2"
+                      className="w-full bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    5. Mật khẩu đăng nhập *
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <div className="rounded-2xl bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-4 py-2">
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      Mật khẩu *
+                    </label>
                     <input
                       type="text"
                       value={regPassword}
@@ -1465,46 +1545,45 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                         setRegPassword(e.target.value);
                         setRegConfirmPassword(e.target.value);
                       }}
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono font-bold focus:outline-none focus:border-teal-600"
+                      className="w-full bg-transparent text-sm font-mono font-bold text-slate-900 focus:outline-none"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    6. Trường Tiểu học
-                  </label>
-                  <div className="relative">
-                    <School className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <div className="rounded-2xl bg-[#EBEBEB] border border-[#CECECE] focus-within:border-[#B8252A] focus-within:bg-white transition-colors px-4 py-2">
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      Trường Tiểu học
+                    </label>
                     <input
                       type="text"
                       value={regSchool}
                       onChange={(e) => setRegSchool(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
+                      className="w-full bg-transparent text-sm font-medium text-slate-900 focus:outline-none"
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-teal-700 text-teal-800 hover:bg-teal-50 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Tạo tài khoản
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => handleRegisterSubmit(e as any, true)}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer"
-                >
-                  <Play className="w-4 h-4" />
-                  Tạo tài khoản & Vào thi ngay
-                </button>
-              </div>
-            </form>
-          )}
+                <div className="space-y-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleRegisterSubmit(e as any, true)}
+                    className="w-full py-3 rounded-full bg-[#B8252A] hover:bg-[#9E1D22] text-white text-sm sm:text-base font-bold transition-colors cursor-pointer"
+                  >
+                    Tạo tài khoản &amp; Vào thi ngay
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearFeedback();
+                      setAuthTab('login');
+                    }}
+                    className="w-full py-2.5 rounded-full bg-white hover:bg-rose-50 text-[#B8252A] border-2 border-[#B8252A] text-sm font-bold transition-colors cursor-pointer"
+                  >
+                    Quay lại Đăng nhập
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     );

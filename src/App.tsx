@@ -124,9 +124,9 @@ export default function App() {
   };
 
   // Sync student profile when user logs in, registers, or updates profile
-  const handleLoginSuccess = (acc: UserAccount) => {
+  const handleLoginSuccess = (acc: UserAccount, remember = true) => {
     setCurrentUser(acc);
-    saveActiveSession(acc);
+    saveActiveSession(acc, remember);
     setStudent({
       fullName: acc.fullName,
       grade: acc.grade,
@@ -441,8 +441,14 @@ export default function App() {
     });
   }, [history, filterMyHistoryOnly, currentUser]);
 
+  const isLoginPortalView = !currentUser && activeSection === 'account';
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900">
+    <div
+      className={`min-h-screen flex flex-col text-slate-900 ${
+        isLoginPortalView ? 'tn-pattern-bg' : 'bg-[#F8FAFC]'
+      }`}
+    >
       {/* Top Bar Contract: 3 Zones separated by gap-8 */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-slate-200 px-4 sm:px-8 py-3.5">
         <div className="max-w-[1360px] mx-auto flex items-center justify-between gap-8">
@@ -604,7 +610,13 @@ export default function App() {
       </div>
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-[1360px] w-full mx-auto px-4 sm:px-8 py-6">
+      <main
+        className={
+          isLoginPortalView
+            ? 'flex-1 w-full flex items-center justify-center'
+            : 'flex-1 max-w-[1360px] w-full mx-auto px-4 sm:px-8 py-6'
+        }
+      >
         {/* ==================== SECTION: ACCOUNT CENTER (ĐĂNG NHẬP / ĐĂNG KÝ / TRANG GIÁO VIÊN) ==================== */}
         {activeSection === 'account' && (
           <AccountCenter
@@ -1662,7 +1674,11 @@ export default function App() {
       )}
 
       {/* Clean Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 px-4 sm:px-8 mt-10">
+      <footer
+        className={`bg-white/95 border-t border-slate-200 py-4 px-4 sm:px-8 ${
+          isLoginPortalView ? '' : 'mt-10'
+        }`}
+      >
         <div className="max-w-[1360px] mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
           <span>
             Hệ thống Ôn luyện Trạng Nguyên Tiếng Việt Cấp Trường · Quản lý Tài khoản, Tạo đề mới & Chấm thi
