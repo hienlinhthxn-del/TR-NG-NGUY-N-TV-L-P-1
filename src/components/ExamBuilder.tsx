@@ -25,8 +25,11 @@ import {
 } from '../data/examDecks';
 import {
   extractTextFromPdfBuffer,
+  extractExamWithGeminiAI,
   parseVietnameseExamText,
 } from '../utils/pdfExamParser';
+
+const GEMINI_KEY_STORAGE = 'tntv_teacher_gemini_api_key';
 
 interface ExamBuilderProps {
   allDecks: ExamDeck[];
@@ -58,6 +61,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
 
   // --- Mode PDF: Import from PDF File State ---
   const pdfFileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastPdfBufferRef = useRef<ArrayBuffer | null>(null);
   const [pdfDeckTitle, setPdfDeckTitle] = useState<string>(
     'Đề Thi Trích Xuất Từ File PDF'
   );
@@ -70,7 +74,16 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
   const [showRawTextEditor, setShowRawTextEditor] = useState<boolean>(false);
   const [pdfParsedQuestions, setPdfParsedQuestions] = useState<Question[]>([]);
   const [isParsingPdf, setIsParsingPdf] = useState<boolean>(false);
+  const [pdfProgressMsg, setPdfProgressMsg] = useState<string>('');
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfParseEngine, setPdfParseEngine] = useState<'ocr' | 'gemini'>('ocr');
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+    } catch {
+      return '';
+    }
+  });
 
   useEffect(() => {
     return () => {
@@ -435,12 +448,29 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
   };
 
   // --- PDF Upload & Parsing Handlers ---
+  const handleGeminiKeyChange = (val: string) => {
+    setGeminiApiKey(val);
+    try {
+      if (val.trim()) {
+        localStorage.setItem(GEMINI_KEY_STORAGE, val.trim());
+      } else {
+        localStorage.removeItem(GEMINI_KEY_STORAGE);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const processPdfArrayBuffer = async (
     buffer: ArrayBuffer,
     displayName: string,
-    previewUrl: string | null
+    previewUrl: string | null,
+    engineOverride?: 'ocr' | 'gemini'
   ) => {
+    const engine = engineOverride || pdfParseEngine;
+    lastPdfBufferRef.current = buffer;
     setIsParsingPdf(true);
+    setPdfProgressMsg('Đang chuẩn bị đọc file PDF...');
     setPdfError(null);
     setPdfFileName(displayName);
     if (previewUrl) {
@@ -458,7 +488,24 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
     }
 
     try {
-      const { pageCount, rawText } = await extractTextFromPdfBuffer(buffer);
+      if (engine === 'gemini') {
+        const aiQuestions = await extractExamWithGeminiAI(
+          buffer,
+          geminiApiKey,
+          (msg) => setPdfProgressMsg(msg)
+        );
+        setPdfParsedQuestions(aiQuestions);
+        setStatusMessage(
+          `Gemini AI đã trích xuất thành công ${aiQuestions.length} câu hỏi chuẩn từ "${displayName}" kèm đáp án & giải thích!`
+        );
+        setTimeout(() => setStatusMessage(null), 6000);
+        return;
+      }
+
+      const { pageCount, rawText, usedOcr } = await extractTextFromPdfBuffer(
+        buffer,
+        (msg) => setPdfProgressMsg(msg)
+      );
       setPdfPageCount(pageCount);
       setPdfRawText(rawText);
 
@@ -466,7 +513,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         setPdfParsedQuestions([]);
         setShowRawTextEditor(true);
         setPdfError(
-          'File PDF này có thể là file ảnh chụp (scan) chưa có lớp chữ. Giáo viên có thể dán nội dung câu hỏi vào ô văn bản bên dưới rồi nhấn "Phân tích lại thành câu hỏi".'
+          'Không đọc được chữ từ file PDF này. Giáo viên hãy thử chuyển sang chế độ "Gemini AI Vision" ở trên hoặc dán nội dung vào ô văn bản.'
         );
         return;
       }
@@ -476,13 +523,17 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
       if (questions.length === 0) {
         setShowRawTextEditor(true);
         setPdfError(
-          'Không tìm thấy câu hỏi theo mẫu "Câu 1.", "Câu 2." trong PDF. Hãy kiểm tra hoặc chỉnh sửa văn bản trích xuất bên dưới rồi nhấn "Phân tích lại".'
+          'Không tách được câu hỏi theo mẫu "Câu 1.", "Câu hỏi 1". Hãy mở ô văn bản bên dưới để kiểm tra hoặc dùng chế độ Gemini AI Vision.'
         );
       } else {
         setStatusMessage(
-          `Đã đọc ${pageCount} trang PDF và tự động tách được ${questions.length} câu hỏi! Hãy rà soát đáp án rồi lưu bộ đề.`
+          `Đã đọc ${pageCount} trang PDF${
+            usedOcr ? ' (bằng OCR nhận diện ảnh Tiếng Việt)' : ''
+          } và tự động tách được ${
+            questions.length
+          } câu hỏi! Hãy rà soát lại đáp án rồi lưu bộ đề.`
         );
-        setTimeout(() => setStatusMessage(null), 5000);
+        setTimeout(() => setStatusMessage(null), 6000);
       }
     } catch (err: any) {
       setPdfError(
@@ -491,6 +542,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
       );
     } finally {
       setIsParsingPdf(false);
+      setPdfProgressMsg('');
     }
   };
 
@@ -725,6 +777,90 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
               </div>
             </div>
 
+            {/* Extraction Engine Selector: Free OCR vs Gemini AI Vision */}
+            <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-800">
+                  Chọn công nghệ đọc file PDF:
+                </span>
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setPdfParseEngine('ocr')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+                      pdfParseEngine === 'ocr'
+                        ? 'bg-white text-teal-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Tự động + OCR Tiếng Việt (Miễn phí)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPdfParseEngine('gemini')}
+                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+                      pdfParseEngine === 'gemini'
+                        ? 'bg-teal-700 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Gemini AI Vision (Chính xác nhất)
+                  </button>
+                </div>
+              </div>
+
+              {pdfParseEngine === 'ocr' ? (
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>Chế độ Miễn phí:</strong> Tự động đọc chữ trong PDF; nếu phát hiện PDF là <strong>ảnh chụp màn hình / scan</strong> (như đề gốc), hệ thống sẽ tự chạy OCR nhận diện chữ Tiếng Việt ngay trên trình duyệt.
+                </p>
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    <strong>Khuyên dùng cho PDF ảnh chụp có nhiều hình minh họa:</strong> Gemini AI đọc trực tiếp cả chữ lẫn hình ảnh trong PDF, tự tách đủ 6 dạng bài và tự giải đáp án đúng. Lấy API Key miễn phí tại{' '}
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-teal-700 font-bold underline"
+                    >
+                      aistudio.google.com/apikey
+                    </a>
+                    .
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="password"
+                      value={geminiApiKey}
+                      onChange={(e) => handleGeminiKeyChange(e.target.value)}
+                      placeholder="Dán Gemini API Key (AIza...) — chỉ lưu riêng trên máy bạn"
+                      className="flex-1 min-w-[240px] px-3.5 py-2 rounded-lg border border-slate-300 text-xs sm:text-sm font-mono focus:outline-none focus:border-teal-600"
+                    />
+                    {lastPdfBufferRef.current && (
+                      <button
+                        type="button"
+                        disabled={isParsingPdf || !geminiApiKey.trim()}
+                        onClick={() => {
+                          if (lastPdfBufferRef.current) {
+                            processPdfArrayBuffer(
+                              lastPdfBufferRef.current,
+                              pdfFileName || 'De_Thi.pdf',
+                              pdfPreviewUrl,
+                              'gemini'
+                            );
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer disabled:opacity-40 whitespace-nowrap"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Chạy lại bằng AI
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* PDF Upload Dropzone */}
             <div className="p-6 rounded-2xl border-2 border-dashed border-teal-500/70 bg-teal-50/30 text-center space-y-4">
               <input
@@ -744,9 +880,11 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-slate-900">
                   {isParsingPdf
-                    ? 'Đang đọc và phân tích nội dung file PDF...'
+                    ? pdfProgressMsg || 'Đang đọc và phân tích nội dung file PDF...'
                     : pdfFileName
-                    ? `Đã tải file: ${pdfFileName} (${pdfPageCount} trang)`
+                    ? `Đã tải file: ${pdfFileName}${
+                        pdfPageCount ? ` (${pdfPageCount} trang)` : ''
+                      }`
                     : 'Tải lên file PDF đề thi Trạng Nguyên Tiếng Việt'}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
