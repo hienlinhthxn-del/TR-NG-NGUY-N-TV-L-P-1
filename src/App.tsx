@@ -164,10 +164,12 @@ export default function App() {
     saveActiveSession(null);
     setStudent({
       fullName: 'Thí sinh Tự do',
-      grade: 'Khối Tiểu học',
-      school: 'Trường Tiểu học Trạng Nguyên',
+      grade: 'Lớp 1A2',
+      school: 'Trường Tiểu học Tủa Chùa',
       studentCode: 'KHÁCH',
     });
+    setAccountInitialTab('login');
+    setActiveSection('account');
   };
 
   // Saved Custom Decks + Builtin Decks
@@ -511,29 +513,39 @@ export default function App() {
             </a>
           </nav>
 
-          {/* Zone 3: 1 Primary Action */}
-          <div className="flex items-center shrink-0">
+          {/* Zone 3: User Profile & Direct Logout Button */}
+          <div className="flex items-center gap-2 shrink-0">
             {currentUser ? (
-              <button
-                type="button"
-                onClick={() =>
-                  openAccountSection(
-                    currentUser.role === 'teacher'
-                      ? 'teacher_monitor'
-                      : 'profile'
-                  )
-                }
-                className="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-teal-700 rounded-lg hover:bg-teal-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              >
-                {currentUser.fullName} ({currentUser.studentCode})
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openAccountSection(
+                      currentUser.role === 'teacher'
+                        ? 'teacher_monitor'
+                        : 'profile'
+                    )
+                  }
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold text-teal-900 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  {currentUser.fullName} ({currentUser.studentCode})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Đăng xuất
+                </button>
+              </>
             ) : (
               <button
                 type="button"
-                onClick={() => openAccountSection('register')}
+                onClick={() => openAccountSection('login')}
                 className="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-teal-700 rounded-lg hover:bg-teal-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
-                Tạo tài khoản / Đăng nhập
+                Đăng nhập / Tạo tài khoản
               </button>
             )}
           </div>
@@ -577,7 +589,7 @@ export default function App() {
         {/* ==================== SECTION: ACCOUNT CENTER (ĐĂNG NHẬP / ĐĂNG KÝ / TRANG GIÁO VIÊN) ==================== */}
         {activeSection === 'account' && (
           <AccountCenter
-            key={accountInitialTab}
+            key={`${currentUser?.id || 'guest'}-${accountInitialTab}`}
             currentUser={currentUser}
             accounts={accounts}
             examHistory={history}
@@ -624,24 +636,51 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openAccountSection(currentUser ? 'roster' : 'login')
-                    }
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <User className="w-3.5 h-3.5 text-teal-700" />
-                    {currentUser ? 'Đổi tài khoản' : 'Đăng nhập'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openAccountSection('register')}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold hover:bg-amber-100 cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <UserPlus className="w-3.5 h-3.5 text-amber-700" />
-                    Tạo tài khoản mới
-                  </button>
+                  {currentUser ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openAccountSection(
+                            currentUser.role === 'teacher'
+                              ? 'teacher_monitor'
+                              : 'profile'
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer whitespace-nowrap shrink-0"
+                      >
+                        <User className="w-3.5 h-3.5 text-teal-700" />
+                        Tài khoản của tôi
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 cursor-pointer whitespace-nowrap shrink-0"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Đăng xuất
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => openAccountSection('login')}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer whitespace-nowrap shrink-0"
+                      >
+                        <LogIn className="w-3.5 h-3.5 text-teal-700" />
+                        Đăng nhập
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openAccountSection('register')}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold hover:bg-amber-100 cursor-pointer whitespace-nowrap shrink-0"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 text-amber-700" />
+                        Tạo tài khoản mới
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
