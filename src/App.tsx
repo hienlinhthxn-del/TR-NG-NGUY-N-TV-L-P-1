@@ -208,92 +208,22 @@ export default function App() {
   const [history, setHistory] = useState<ExamAttempt[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_HISTORY_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: ExamAttempt[] = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(
+            (item) => !String(item?.id || '').startsWith('sample-hs-')
+          );
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
+      }
     } catch {
       // ignore storage errors
     }
-    return [
-      {
-        id: 'sample-hs-01',
-        accountId: 'hs-01',
-        studentCode: 'SBD-2601',
-        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
-        rankTitle: 'Trạng Nguyên',
-        studentName: 'Tòng Hoài An',
-        grade: 'Lớp 1A2',
-        score: 290,
-        maxScore: 300,
-        correctCount: 29,
-        totalQuestions: 30,
-        timeSpentSeconds: 780,
-        completedAt: '25/11/2026, 19:45',
-        mode: 'exam',
-      },
-      {
-        id: 'sample-hs-02',
-        accountId: 'hs-02',
-        studentCode: 'SBD-2602',
-        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
-        rankTitle: 'Bảng Nhãn',
-        studentName: 'Lò Huyền Anh',
-        grade: 'Lớp 1A2',
-        score: 270,
-        maxScore: 300,
-        correctCount: 27,
-        totalQuestions: 30,
-        timeSpentSeconds: 850,
-        completedAt: '25/11/2026, 19:20',
-        mode: 'practice',
-      },
-      {
-        id: 'sample-hs-03',
-        accountId: 'hs-03',
-        studentCode: 'SBD-2603',
-        roundTitle: 'Đề số 2: Đề Luyện Thi Hương - Cấp Trường Mở Rộng',
-        rankTitle: 'Bảng Nhãn',
-        studentName: 'Nguyễn Hoàng Tú Anh',
-        grade: 'Lớp 1A2',
-        score: 260,
-        maxScore: 300,
-        correctCount: 26,
-        totalQuestions: 30,
-        timeSpentSeconds: 910,
-        completedAt: '25/11/2026, 18:55',
-        mode: 'exam',
-      },
-      {
-        id: 'sample-hs-05',
-        accountId: 'hs-05',
-        studentCode: 'SBD-2605',
-        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
-        rankTitle: 'Thám Hoa',
-        studentName: 'Tô Hải Đăng',
-        grade: 'Lớp 1A2',
-        score: 240,
-        maxScore: 300,
-        correctCount: 24,
-        totalQuestions: 30,
-        timeSpentSeconds: 1020,
-        completedAt: '25/11/2026, 18:10',
-        mode: 'practice',
-      },
-      {
-        id: 'sample-hs-08',
-        accountId: 'hs-08',
-        studentCode: 'SBD-2608',
-        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
-        rankTitle: 'Hoàng Giáp',
-        studentName: 'Đặng Anh Khôi',
-        grade: 'Lớp 1A2',
-        score: 190,
-        maxScore: 300,
-        correctCount: 19,
-        totalQuestions: 30,
-        timeSpentSeconds: 1120,
-        completedAt: '25/11/2026, 17:40',
-        mode: 'practice',
-      },
-    ];
+    return [];
   });
 
   // Callback invoked automatically when student submits or timer expires
@@ -1578,7 +1508,17 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
-                    {displayedHistory.map((item, idx) => (
+                    {displayedHistory.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="py-10 px-4 text-center text-sm text-slate-500"
+                        >
+                          Chưa có học sinh nào nộp bài. Bảng vàng sẽ tự động cập nhật ngay khi có học sinh hoàn thành bài thi.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedHistory.map((item, idx) => (
                       <tr key={item.id} className="hover:bg-slate-50/80">
                         <td className="py-3.5 px-4 font-bold text-slate-700 tabular-nums">
                           #{idx + 1}
@@ -1611,7 +1551,8 @@ export default function App() {
                           {item.completedAt}
                         </td>
                       </tr>
-                    ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
