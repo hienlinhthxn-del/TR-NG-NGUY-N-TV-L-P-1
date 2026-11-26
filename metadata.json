@@ -1,0 +1,6 @@
+{
+  "name": "Trạng Nguyên Tiếng Việt - Luyện Thi Cấp Trường",
+  "description": "Hệ thống ôn luyện và thử tài Trạng Nguyên Tiếng Việt cấp trường với 30 câu hỏi tương tác đa dạng (trắc nghiệm, điền từ, nối cặp, sắp xếp, phân loại) cùng chấm điểm và giải thích chi tiết.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
