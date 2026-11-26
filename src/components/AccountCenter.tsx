@@ -1437,23 +1437,6 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                     Tạo tài khoản
                   </button>
                 </div>
-
-                <div className="relative py-2 flex items-center justify-center">
-                  <div className="w-full border-t border-slate-200" />
-                  <span className="px-3 bg-white text-xs font-medium text-slate-500 whitespace-nowrap">
-                    Hoặc
-                  </span>
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onGoToExam}
-                  className="w-full py-2 inline-flex items-center justify-center gap-2 text-sm font-bold text-[#B8252A] hover:underline cursor-pointer"
-                >
-                  <Play className="w-4 h-4" />
-                  Vào luyện thi ngay (Chế độ Khách)
-                </button>
               </form>
             ) : (
               <form

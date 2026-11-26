@@ -123,6 +123,15 @@ export default function App() {
     setActiveSection('account');
   };
 
+  const navigateSection = (section: ActiveSection) => {
+    if (!currentUser && section !== 'account') {
+      setAccountInitialTab('login');
+      setActiveSection('account');
+      return;
+    }
+    setActiveSection(section);
+  };
+
   // Sync student profile when user logs in, registers, or updates profile
   const handleLoginSuccess = (acc: UserAccount, remember = true) => {
     setCurrentUser(acc);
@@ -346,7 +355,7 @@ export default function App() {
     activeQuestions,
     EXAM_ROUNDS[0],
     handleRoundCompleted,
-    activeSection === 'exam'
+    Boolean(currentUser) && activeSection === 'exam'
   );
 
   const isSubmitted = status === 'submitted';
@@ -441,7 +450,10 @@ export default function App() {
     });
   }, [history, filterMyHistoryOnly, currentUser]);
 
-  const isLoginPortalView = !currentUser && activeSection === 'account';
+  const effectiveSection: ActiveSection = currentUser
+    ? activeSection
+    : 'account';
+  const isLoginPortalView = !currentUser && effectiveSection === 'account';
 
   return (
     <div
@@ -457,86 +469,92 @@ export default function App() {
             href="#exam"
             onClick={(e) => {
               e.preventDefault();
-              setActiveSection('exam');
+              navigateSection('exam');
             }}
             className="text-lg sm:text-xl font-display font-extrabold tracking-tight text-teal-800 whitespace-nowrap shrink-0"
           >
             Trạng Nguyên Tiếng Việt
           </a>
 
-          {/* Zone 2: 5 concise single-line text navigation links */}
-          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600">
-            <a
-              href="#lobby"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection('lobby');
-              }}
-              className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeSection === 'lobby'
-                  ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
-                  : ''
-              }`}
-            >
-              Chọn vòng thi
-            </a>
-            <a
-              href="#exam"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection('exam');
-              }}
-              className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeSection === 'exam'
-                  ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
-                  : ''
-              }`}
-            >
-              Làm bài thi
-            </a>
-            <a
-              href="#guide"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection('guide');
-              }}
-              className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeSection === 'guide'
-                  ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
-                  : ''
-              }`}
-            >
-              Ôn kiến thức
-            </a>
-            <a
-              href="#history"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection('history');
-              }}
-              className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeSection === 'history'
-                  ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
-                  : ''
-              }`}
-            >
-              Bảng vàng
-            </a>
-            <a
-              href="#account"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveSection('account');
-              }}
-              className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeSection === 'account'
-                  ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
-                  : ''
-              }`}
-            >
-              Tài khoản
-            </a>
-          </nav>
+          {/* Zone 2: Navigation links (only enabled after login) */}
+          {currentUser ? (
+            <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600">
+              <a
+                href="#lobby"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigateSection('lobby');
+                }}
+                className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
+                  effectiveSection === 'lobby'
+                    ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
+                    : ''
+                }`}
+              >
+                Chọn vòng thi
+              </a>
+              <a
+                href="#exam"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigateSection('exam');
+                }}
+                className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
+                  effectiveSection === 'exam'
+                    ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
+                    : ''
+                }`}
+              >
+                Làm bài thi
+              </a>
+              <a
+                href="#guide"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigateSection('guide');
+                }}
+                className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
+                  effectiveSection === 'guide'
+                    ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
+                    : ''
+                }`}
+              >
+                Ôn kiến thức
+              </a>
+              <a
+                href="#history"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigateSection('history');
+                }}
+                className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
+                  effectiveSection === 'history'
+                    ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
+                    : ''
+                }`}
+              >
+                Bảng vàng
+              </a>
+              <a
+                href="#account"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigateSection('account');
+                }}
+                className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
+                  effectiveSection === 'account'
+                    ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
+                    : ''
+                }`}
+              >
+                Tài khoản
+              </a>
+            </nav>
+          ) : (
+            <div className="hidden md:flex items-center text-xs font-semibold text-slate-500">
+              Vui lòng đăng nhập tài khoản để bắt đầu ôn luyện &amp; làm bài thi
+            </div>
+          )}
 
           {/* Zone 3: User Profile & Direct Logout Button */}
           <div className="flex items-center gap-2 shrink-0">
@@ -577,37 +595,37 @@ export default function App() {
         </div>
       </header>
 
-      {/* Mobile Navigation Strip */}
-      <div className="md:hidden flex items-center gap-2 overflow-x-auto bg-white border-b border-slate-200 px-4 py-2">
-        {[
-          { id: 'lobby', label: 'Chọn vòng thi' },
-          { id: 'exam', label: `Làm bài (${activeQuestions.length} câu)` },
-          { id: 'guide', label: 'Ôn kiến thức' },
-          { id: 'history', label: 'Bảng vàng' },
-          {
-            id: 'account',
-            label:
-              currentUser?.role === 'teacher'
-                ? 'Trang Giáo viên'
-                : currentUser
-                ? 'Hồ sơ Tài khoản'
-                : 'Đăng nhập / Đăng ký',
-          },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveSection(tab.id as ActiveSection)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer ${
-              activeSection === tab.id
-                ? 'bg-teal-700 text-white'
-                : 'text-slate-600 bg-slate-100'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Mobile Navigation Strip (only shown after login) */}
+      {currentUser && (
+        <div className="md:hidden flex items-center gap-2 overflow-x-auto bg-white border-b border-slate-200 px-4 py-2">
+          {[
+            { id: 'lobby', label: 'Chọn vòng thi' },
+            { id: 'exam', label: `Làm bài (${activeQuestions.length} câu)` },
+            { id: 'guide', label: 'Ôn kiến thức' },
+            { id: 'history', label: 'Bảng vàng' },
+            {
+              id: 'account',
+              label:
+                currentUser.role === 'teacher'
+                  ? 'Trang Giáo viên'
+                  : 'Hồ sơ Tài khoản',
+            },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => navigateSection(tab.id as ActiveSection)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer ${
+                effectiveSection === tab.id
+                  ? 'bg-teal-700 text-white'
+                  : 'text-slate-600 bg-slate-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Main Content Container */}
       <main
@@ -618,7 +636,7 @@ export default function App() {
         }
       >
         {/* ==================== SECTION: ACCOUNT CENTER (ĐĂNG NHẬP / ĐĂNG KÝ / TRANG GIÁO VIÊN) ==================== */}
-        {activeSection === 'account' && (
+        {effectiveSection === 'account' && (
           <AccountCenter
             currentUser={currentUser}
             accounts={accounts}
@@ -644,7 +662,7 @@ export default function App() {
         )}
 
         {/* ==================== SECTION 1: LOBBY & ROUND MANAGEMENT ==================== */}
-        {activeSection === 'lobby' && (
+        {effectiveSection === 'lobby' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-100">
@@ -907,7 +925,7 @@ export default function App() {
         )}
 
         {/* ==================== SECTION 2: EXAM WORKSPACE & FINAL RESULT DASHBOARD ==================== */}
-        {activeSection === 'exam' && (
+        {effectiveSection === 'exam' && (
           <div className="space-y-6">
             {/* Final Result Dashboard Screen after student clicks Submit */}
             {isSubmitted && finalResult && showResultDashboard ? (
@@ -1377,7 +1395,7 @@ export default function App() {
         )}
 
         {/* ==================== SECTION 4: STUDY GUIDE (ÔN KIẾN THỨC TIẾNG VIỆT) ==================== */}
-        {activeSection === 'guide' && (
+        {effectiveSection === 'guide' && (
           <div className="max-w-5xl mx-auto space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
@@ -1456,14 +1474,14 @@ export default function App() {
         )}
 
         {/* ==================== SECTION 5: SKELETON CODE BLUEPRINT VIEWER ==================== */}
-        {activeSection === 'code_blueprint' && (
+        {effectiveSection === 'code_blueprint' && (
           <ExamRoundCodeBlueprint
             onBackToExam={() => setActiveSection('exam')}
           />
         )}
 
         {/* ==================== SECTION 6: ORIGINAL PDF VIEWER (ĐỀ GỐC PDF) ==================== */}
-        {activeSection === 'pdf_source' && (
+        {effectiveSection === 'pdf_source' && (
           <div className="max-w-5xl mx-auto space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1496,7 +1514,7 @@ export default function App() {
         )}
 
         {/* ==================== SECTION 7: LEADERBOARD / HISTORY (BẢNG VÀNG THÀNH TÍCH) ==================== */}
-        {activeSection === 'history' && (
+        {effectiveSection === 'history' && (
           <div className="max-w-5xl mx-auto space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
@@ -1686,36 +1704,40 @@ export default function App() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => setActiveSection('account')}
+              onClick={() => navigateSection('account')}
               className="hover:text-slate-800 cursor-pointer font-medium"
             >
-              Tài khoản ({currentUser ? currentUser.username : 'Khách'})
+              {currentUser ? `Tài khoản (${currentUser.username})` : 'Đăng nhập'}
             </button>
-            <span aria-hidden="true">·</span>
-            <button
-              type="button"
-              onClick={() => setActiveSection('guide')}
-              className="hover:text-slate-800 cursor-pointer font-medium"
-            >
-              Ôn kiến thức
-            </button>
-            <span aria-hidden="true">·</span>
-            <button
-              type="button"
-              onClick={() => setActiveSection('code_blueprint')}
-              className="inline-flex items-center gap-1 hover:text-slate-800 cursor-pointer font-medium"
-            >
-              <FileCode2 className="w-3.5 h-3.5" />
-              Mã nguồn khung
-            </button>
-            <span aria-hidden="true">·</span>
-            <button
-              type="button"
-              onClick={() => setActiveSection('pdf_source')}
-              className="hover:text-slate-800 cursor-pointer"
-            >
-              Xem đề PDF gốc
-            </button>
+            {currentUser && (
+              <>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => navigateSection('guide')}
+                  className="hover:text-slate-800 cursor-pointer font-medium"
+                >
+                  Ôn kiến thức
+                </button>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => navigateSection('code_blueprint')}
+                  className="inline-flex items-center gap-1 hover:text-slate-800 cursor-pointer font-medium"
+                >
+                  <FileCode2 className="w-3.5 h-3.5" />
+                  Mã nguồn khung
+                </button>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => navigateSection('pdf_source')}
+                  className="hover:text-slate-800 cursor-pointer"
+                >
+                  Xem đề PDF gốc
+                </button>
+              </>
+            )}
           </div>
         </div>
       </footer>
