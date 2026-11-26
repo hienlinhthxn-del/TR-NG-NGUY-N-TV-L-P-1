@@ -140,7 +140,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
     }
 
     const nextNum = manualQuestions.length + 1;
-    const baseId = Date.now();
+    const baseId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
     let newQ: Question | null = null;
 
     if (qType === 'mcq') {
@@ -265,7 +265,14 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         setStatusMessage('Câu sắp xếp cần có ít nhất 3 tiếng.');
         return;
       }
-      const shuffled = [...words].reverse();
+      const shuffled = [...words];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      if (shuffled.every((w, i) => w === words[i])) {
+        shuffled.reverse();
+      }
       newQ = {
         id: baseId,
         number: nextNum,
@@ -326,6 +333,17 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
       setManualQuestions((prev) => [...prev, newQ!]);
       setQPrompt('');
       setQExplanation('');
+      if (qType === 'mcq') {
+        setOptA('');
+        setOptB('');
+        setOptC('');
+        setOptD('');
+      } else if (qType === 'fill_text' || qType === 'dropdown') {
+        setCorrectText('');
+        setHintListText('');
+      } else if (qType === 'ordering') {
+        setOrderSentence('');
+      }
       setStatusMessage(
         `Đã thêm Câu ${nextNum} (${newQ.typeLabel}) vào đề đang soạn!`
       );
@@ -335,9 +353,10 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
 
   const handleLoadTemplateQuestions = (count: number) => {
     const pool = [...QUESTIONS, ...DECK_2_QUESTIONS];
+    const baseId = Date.now() * 1000;
     const picked = pool.slice(0, count).map((q, idx) => ({
       ...q,
-      id: Date.now() + idx,
+      id: baseId + idx,
       number: manualQuestions.length + idx + 1,
     }));
     setManualQuestions((prev) => [...prev, ...picked]);

@@ -257,7 +257,7 @@ export const DECK_2_QUESTIONS: Question[] = [
       ['M', 'È', 'O', 'K', 'L'],
       ['A', 'B', 'C', 'Á', 'V'],
       ['G', 'À', 'T', 'H', 'Ỏ'],
-      ['S', 'U', 'V', 'I', 'T'],
+      ['S', 'U', 'K', 'I', 'T'],
       ['C', 'U', 'A', 'N', 'P'],
     ],
     sentenceBefore: 'Ô chữ trên có tất cả ',
@@ -402,6 +402,7 @@ export const DECK_2_QUESTIONS: Question[] = [
     prompt: 'Sắp xếp các chữ sau để tạo thành từ chỉ người thân trong gia đình.',
     orderingTokens: ['Ô', 'b', 'n', 'à', 'g'],
     correctOrder: ['Ô', 'n', 'g', 'b', 'à'],
+    orderingDisplayOverrides: { Ôngbà: 'Ông bà' },
     orderingJoiner: '',
     explanation:
       'Ghép các chữ cái Ô, n, g, b, à theo đúng thứ tự ta được từ "Ông bà".',
@@ -601,12 +602,13 @@ export function generateRandomizedDeck(options: {
     shuffled[j] = temp;
   }
 
+  const baseId = Date.now() * 1000;
   const selected = shuffled
     .slice(0, Math.min(options.questionCount, shuffled.length))
     .map((q, idx) => {
       const cloned: Question = {
         ...q,
-        id: Date.now() + idx,
+        id: baseId + idx,
         number: idx + 1,
       };
       // Nếu bật đảo thứ tự các thẻ trong bài Sắp xếp

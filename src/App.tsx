@@ -100,10 +100,10 @@ export default function App() {
   const [student, setStudent] = useState<StudentProfile>(() => {
     const initial = loadActiveSession();
     return {
-      fullName: initial?.fullName || 'Tòng Hoài An',
+      fullName: initial?.fullName || 'Thí sinh Tự do',
       grade: initial?.grade || 'Lớp 1A2',
       school: initial?.school || 'Trường Tiểu học Tủa Chùa',
-      studentCode: initial?.studentCode || 'SBD-2601',
+      studentCode: initial?.studentCode || 'KHÁCH',
     };
   });
 
@@ -135,7 +135,10 @@ export default function App() {
     });
   };
 
-  const handleRegisterSuccess = (newAcc: UserAccount) => {
+  const handleRegisterSuccess = (
+    newAcc: UserAccount,
+    keepCurrentSession = false
+  ) => {
     const updatedList = [newAcc, ...accounts];
     setAccounts(updatedList);
     try {
@@ -143,7 +146,9 @@ export default function App() {
     } catch {
       // ignore
     }
-    handleLoginSuccess(newAcc);
+    if (!keepCurrentSession) {
+      handleLoginSuccess(newAcc);
+    }
   };
 
   const handleUpdateProfile = (updatedAcc: UserAccount) => {
@@ -306,7 +311,7 @@ export default function App() {
       };
 
       setHistory((prev) => {
-        const updated = [newAttempt, ...prev].slice(0, 30);
+        const updated = [newAttempt, ...prev].slice(0, 200);
         try {
           localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(updated));
         } catch {
@@ -340,7 +345,8 @@ export default function App() {
   } = useExamRoundManager(
     activeQuestions,
     EXAM_ROUNDS[0],
-    handleRoundCompleted
+    handleRoundCompleted,
+    activeSection === 'exam'
   );
 
   const isSubmitted = status === 'submitted';
@@ -359,7 +365,8 @@ export default function App() {
   const handleResetExam = (
     newMode?: 'exam' | 'practice',
     customRound?: ExamRoundConfig,
-    deckToUse?: ExamDeck
+    deckToUse?: ExamDeck,
+    useRoundDuration = false
   ) => {
     if (newMode) setExamMode(newMode);
     const targetDeck = deckToUse || activeDeck;
@@ -369,7 +376,9 @@ export default function App() {
     const baseRound = customRound || selectedRound;
     const syncedRound: ExamRoundConfig = {
       ...baseRound,
-      durationMinutes: deckToUse
+      durationMinutes: useRoundDuration
+        ? baseRound.durationMinutes
+        : deckToUse
         ? targetDeck.durationMinutes
         : baseRound.durationMinutes,
       maxScore: targetDeck.questions.length * 10,
@@ -414,12 +423,22 @@ export default function App() {
     activeQuestions[0];
 
   const displayedHistory = useMemo(() => {
-    if (!filterMyHistoryOnly || !currentUser) return history;
-    return history.filter(
-      (item) =>
-        item.accountId === currentUser.id ||
-        item.studentName.toLowerCase() === currentUser.fullName.toLowerCase()
-    );
+    const filtered =
+      !filterMyHistoryOnly || !currentUser
+        ? history
+        : history.filter(
+            (item) =>
+              item.accountId === currentUser.id ||
+              item.studentName.toLowerCase() ===
+                currentUser.fullName.toLowerCase()
+          );
+    return [...filtered].sort((a, b) => {
+      const ratioA = a.maxScore > 0 ? a.score / a.maxScore : 0;
+      const ratioB = b.maxScore > 0 ? b.score / b.maxScore : 0;
+      if (ratioB !== ratioA) return ratioB - ratioA;
+      if (b.score !== a.score) return b.score - a.score;
+      return a.timeSpentSeconds - b.timeSpentSeconds;
+    });
   }, [history, filterMyHistoryOnly, currentUser]);
 
   return (
@@ -589,7 +608,6 @@ export default function App() {
         {/* ==================== SECTION: ACCOUNT CENTER (ĐĂNG NHẬP / ĐĂNG KÝ / TRANG GIÁO VIÊN) ==================== */}
         {activeSection === 'account' && (
           <AccountCenter
-            key={`${currentUser?.id || 'guest'}-${accountInitialTab}`}
             currentUser={currentUser}
             accounts={accounts}
             examHistory={history}
@@ -855,7 +873,7 @@ export default function App() {
                   type="button"
                   disabled={!agreedRules}
                   onClick={() =>
-                    handleResetExam('practice', selectedRound, activeDeck)
+                    handleResetExam('practice', selectedRound, activeDeck, true)
                   }
                   className="px-5 py-2.5 rounded-xl border-2 border-teal-700 text-teal-800 font-bold text-sm hover:bg-teal-50 transition-colors cursor-pointer disabled:opacity-40 whitespace-nowrap shrink-0"
                 >
@@ -865,7 +883,7 @@ export default function App() {
                   type="button"
                   disabled={!agreedRules}
                   onClick={() =>
-                    handleResetExam('exam', selectedRound, activeDeck)
+                    handleResetExam('exam', selectedRound, activeDeck, true)
                   }
                   className="px-6 py-2.5 rounded-xl bg-teal-700 text-white font-bold text-sm hover:bg-teal-800 transition-colors cursor-pointer disabled:opacity-40 whitespace-nowrap shrink-0"
                 >
@@ -951,8 +969,14 @@ export default function App() {
                     <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
                       <button
                         type="button"
+                        disabled={examMode === 'exam' && !isSubmitted}
+                        title={
+                          examMode === 'exam' && !isSubmitted
+                            ? 'Không thể xem đáp án khi đang trong chế độ Thi thử. Hãy nộp bài trước.'
+                            : undefined
+                        }
                         onClick={() => setExamMode('practice')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shrink-0 ${
                           examMode === 'practice'
                             ? 'bg-white text-teal-900 shadow-2xs'
                             : 'text-slate-600 hover:text-slate-900'

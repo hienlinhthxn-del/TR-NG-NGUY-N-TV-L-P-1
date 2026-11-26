@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   User,
   Lock,
@@ -411,7 +411,7 @@ export function loadActiveSession(): UserAccount | null {
   } catch {
     // ignore
   }
-  return DEFAULT_ACCOUNTS[1] || null;
+  return null;
 }
 
 export function saveActiveSession(account: UserAccount | null) {
@@ -441,7 +441,10 @@ interface AccountCenterProps {
   examBuilderNode?: React.ReactNode;
   initialTab?: AccountTabType;
   onLoginSuccess: (account: UserAccount) => void;
-  onRegisterSuccess: (account: UserAccount) => void;
+  onRegisterSuccess: (
+    account: UserAccount,
+    keepCurrentSession?: boolean
+  ) => void;
   onUpdateProfile: (updated: UserAccount) => void;
   onLogout: () => void;
   onGoToExam: () => void;
@@ -534,6 +537,32 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Sync active tab and profile fields when user or requested initialTab changes without remounting
+  useEffect(() => {
+    if (!currentUser) {
+      setAuthTab(initialTab === 'register' ? 'register' : 'login');
+    } else if (currentUser.role === 'student') {
+      setAuthTab('profile');
+    } else if (
+      initialTab === 'teacher_monitor' ||
+      initialTab === 'teacher_create_exam' ||
+      initialTab === 'roster' ||
+      initialTab === 'register' ||
+      initialTab === 'profile'
+    ) {
+      setAuthTab(initialTab);
+    } else {
+      setAuthTab('teacher_monitor');
+    }
+  }, [currentUser?.id, currentUser?.role, initialTab]);
+
+  useEffect(() => {
+    setEditFullName(currentUser?.fullName || '');
+    setEditBirthDate(currentUser?.birthDate || '');
+    setEditGrade(currentUser?.grade || 'Lớp 1A2');
+    setEditSchool(currentUser?.school || 'Trường Tiểu học Tủa Chùa');
+  }, [currentUser]);
+
   const clearFeedback = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -544,6 +573,15 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     () => accounts.filter((a) => a.role === 'student'),
     [accounts]
   );
+
+  const nextStudentCodeNumber = useMemo(() => {
+    const maxNum = studentAccounts.reduce((max, acc) => {
+      const m = acc.studentCode.match(/(\d+)$/);
+      const num = m ? parseInt(m[1], 10) : 0;
+      return num > max ? num : max;
+    }, 2600);
+    return maxNum + 1;
+  }, [studentAccounts]);
 
   // Logged-in student's own personal exam attempts
   const myPersonalAttempts = useMemo(() => {
@@ -581,20 +619,28 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
             stu.fullName.trim().toLowerCase()
       );
       const attemptCount = stuAttempts.length;
-      const highestScore =
-        attemptCount > 0 ? Math.max(...stuAttempts.map((a) => a.score)) : 0;
+      const bestAttempt =
+        attemptCount > 0
+          ? stuAttempts.reduce((best, cur) => {
+              const curRatio = cur.maxScore > 0 ? cur.score / cur.maxScore : 0;
+              const bestRatio =
+                best.maxScore > 0 ? best.score / best.maxScore : 0;
+              if (curRatio !== bestRatio) return curRatio > bestRatio ? cur : best;
+              return cur.score > best.score ? cur : best;
+            })
+          : null;
+      const highestScore = bestAttempt ? bestAttempt.score : 0;
+      const bestMaxScore = bestAttempt ? bestAttempt.maxScore : 300;
+      const bestRatio =
+        bestAttempt && bestAttempt.maxScore > 0
+          ? bestAttempt.score / bestAttempt.maxScore
+          : 0;
       const avgScore =
         attemptCount > 0
           ? Math.round(
               stuAttempts.reduce((sum, a) => sum + a.score, 0) / attemptCount
             )
           : 0;
-      const bestAttempt =
-        attemptCount > 0
-          ? stuAttempts.reduce((best, cur) =>
-              cur.score > best.score ? cur : best
-            )
-          : null;
       const latestAttempt = attemptCount > 0 ? stuAttempts[0] : null;
 
       return {
@@ -602,6 +648,8 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
         attempts: stuAttempts,
         attemptCount,
         highestScore,
+        bestMaxScore,
+        bestRatio,
         avgScore,
         bestRank: bestAttempt?.rankTitle || '—',
         latestCompletedAt: latestAttempt?.completedAt || 'Chưa làm bài',
@@ -647,12 +695,12 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
         return false;
       if (
         monitorFilter === 'passed' &&
-        (row.attemptCount === 0 || row.highestScore < 200)
+        (row.attemptCount === 0 || row.bestRatio < 2 / 3)
       )
         return false;
       if (
         monitorFilter === 'needs_help' &&
-        (row.attemptCount === 0 || row.highestScore >= 200)
+        (row.attemptCount === 0 || row.bestRatio >= 2 / 3)
       )
         return false;
 
@@ -795,7 +843,6 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
       return;
     }
 
-    const nextNum = studentAccounts.length + 1;
     const newAccount: UserAccount = {
       id: `acc-${Date.now()}`,
       username: cleanUser,
@@ -806,15 +853,13 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
       grade: regGrade.trim() || 'Lớp 1A2',
       school: regSchool.trim() || 'Trường Tiểu học Tủa Chùa',
       role: 'student',
-      studentCode: `SBD-${2600 + nextNum}`,
+      studentCode: `SBD-${nextStudentCodeNumber}`,
       createdAt: new Date().toLocaleDateString('vi-VN'),
     };
 
-    // If teacher is logged in and adding a student, don't log out the teacher unless startExamImmediately
+    // If teacher is logged in and adding a student, keep teacher session active
     if (currentUser?.role === 'teacher' && !startExamImmediately) {
-      onRegisterSuccess(newAccount);
-      // Restore teacher session immediately after adding student to roster
-      onLoginSuccess(currentUser);
+      onRegisterSuccess(newAccount, true);
       setRegFullName('');
       setRegUsername('');
       setRegBirthDate('');
@@ -825,7 +870,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
       return;
     }
 
-    onRegisterSuccess(newAccount);
+    onRegisterSuccess(newAccount, false);
     setEditFullName(newAccount.fullName);
     setEditBirthDate(newAccount.birthDate || '');
     setEditGrade(newAccount.grade);
@@ -878,7 +923,11 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     const text = `Họ tên: ${acc.fullName} | Tên đăng nhập: ${acc.username} | Mật khẩu: ${
       acc.defaultPlainPassword || 'Tuachua2026'
     }`;
-    navigator.clipboard.writeText(text);
+    try {
+      navigator.clipboard?.writeText(text)?.catch(() => {});
+    } catch {
+      // ignore clipboard errors on non-HTTPS contexts
+    }
     setCopiedId(acc.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -887,10 +936,17 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   // CASE 1: STUDENT VIEW (CHỈ HIỂN THỊ TÀI KHOẢN CỦA BẢN THÂN HỌC SINH + NÚT ĐĂNG XUẤT)
   // ============================================================================
   if (currentUser && currentUser.role === 'student') {
-    const highestMyScore =
+    const bestMyAttempt =
       myPersonalAttempts.length > 0
-        ? Math.max(...myPersonalAttempts.map((a) => a.score))
-        : 0;
+        ? myPersonalAttempts.reduce((best, cur) => {
+            const curRatio = cur.maxScore > 0 ? cur.score / cur.maxScore : 0;
+            const bestRatio =
+              best.maxScore > 0 ? best.score / best.maxScore : 0;
+            return curRatio > bestRatio ? cur : best;
+          })
+        : null;
+    const highestMyScore = bestMyAttempt ? bestMyAttempt.score : 0;
+    const highestMyMaxScore = bestMyAttempt ? bestMyAttempt.maxScore : 300;
 
     return (
       <div className="max-w-5xl mx-auto space-y-6">
@@ -1004,7 +1060,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 <div className="flex justify-between">
                   <span className="text-slate-500">Điểm cao nhất của em:</span>
                   <strong className="text-amber-700 tabular-nums">
-                    {highestMyScore} / 300 điểm
+                    {highestMyScore} / {highestMyMaxScore} điểm
                   </strong>
                 </div>
               </div>
@@ -1651,11 +1707,11 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                   },
                   {
                     id: 'passed',
-                    label: 'Đạt >= 200đ',
+                    label: 'Đạt tốt (>= 67%)',
                   },
                   {
                     id: 'needs_help',
-                    label: 'Cần rèn thêm (< 200đ)',
+                    label: 'Cần rèn thêm (< 67%)',
                   },
                 ].map((f) => (
                   <button
@@ -1728,12 +1784,12 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                           {hasPracticed ? (
                             <span
                               className={`font-display font-extrabold ${
-                                row.highestScore >= 200
+                                row.bestRatio >= 2 / 3
                                   ? 'text-teal-800'
                                   : 'text-rose-600'
                               }`}
                             >
-                              {row.highestScore} / 300
+                              {row.highestScore} / {row.bestMaxScore}
                             </span>
                           ) : (
                             <span className="text-slate-400">—</span>
@@ -1907,7 +1963,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 </p>
               </div>
               <span className="text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg tabular-nums">
-                SBD dự kiến: SBD-{2600 + studentAccounts.length + 1}
+                SBD dự kiến: SBD-{nextStudentCodeNumber}
               </span>
             </div>
 
@@ -2022,7 +2078,8 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               <div className="p-3 rounded-xl bg-teal-50 border border-teal-200">
                 <div className="text-xs text-teal-800">Điểm cao nhất</div>
                 <div className="text-lg font-extrabold text-teal-900 tabular-nums mt-0.5">
-                  {inspectedStudentRow.highestScore} / 300
+                  {inspectedStudentRow.highestScore} /{' '}
+                  {inspectedStudentRow.bestMaxScore}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">

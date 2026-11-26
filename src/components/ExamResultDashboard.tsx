@@ -212,7 +212,7 @@ export const ExamResultDashboard: React.FC<ExamResultDashboardProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100">
           <div>
             <h3 className="text-base sm:text-lg font-display font-bold text-slate-900">
-              Bảng đối chiếu đáp án chi tiết (30 câu)
+              Bảng đối chiếu đáp án chi tiết ({result.totalQuestions} câu)
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Xem câu trả lời của học sinh, đáp án đúng của hệ thống và lời giải chi tiết.
@@ -326,9 +326,14 @@ export const ExamResultDashboard: React.FC<ExamResultDashboardProps> = ({
                 <div className="shrink-0">
                   <button
                     type="button"
-                    onClick={() =>
-                      onReviewQuestionInStage(item.questionNumber - 1)
-                    }
+                    onClick={() => {
+                      const qIdx = result.questionBreakdowns.findIndex(
+                        (b) => b.questionId === item.questionId
+                      );
+                      onReviewQuestionInStage(
+                        qIdx >= 0 ? qIdx : item.questionNumber - 1
+                      );
+                    }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-teal-600 text-xs font-semibold text-teal-800 bg-white hover:bg-teal-50/40 transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <Eye className="w-3.5 h-3.5" />

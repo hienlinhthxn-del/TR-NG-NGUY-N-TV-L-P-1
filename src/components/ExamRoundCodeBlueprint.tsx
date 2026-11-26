@@ -328,7 +328,11 @@ export function calculateRoundScore(questions: Question[], answers: Record<numbe
       : scoringModuleCode;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(currentCode);
+    try {
+      navigator.clipboard?.writeText(currentCode)?.catch(() => {});
+    } catch {
+      // ignore clipboard errors on non-HTTPS contexts
+    }
     setCopiedTab(activeTab);
     setTimeout(() => setCopiedTab(null), 2000);
   };

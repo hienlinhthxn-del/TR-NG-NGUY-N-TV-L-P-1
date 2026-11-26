@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   XCircle,
@@ -46,6 +46,15 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
     utterance.rate = 0.92;
     window.speechSynthesis.speak(utterance);
   };
+
+  // Stop speech synthesis automatically when switching questions or unmounting
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [question.id]);
 
   const handleImageError = (key: string) => {
     setImageErrors((prev) => ({ ...prev, [key]: true }));
@@ -147,21 +156,22 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
 
     return (
       <div className="space-y-5">
-        {question.imageUrl && (
+        {(question.imageUrl || question.wordSearchGrid) && (
           <div className="flex flex-wrap items-start gap-6 my-2">
-            {!imageErrors['main'] ? (
-              <img
-                src={question.imageUrl}
-                alt={question.imageAlt || question.prompt}
-                referrerPolicy="no-referrer"
-                onError={() => handleImageError('main')}
-                className="max-h-64 rounded-xl border border-slate-200 object-contain bg-white p-3 shadow-xs"
-              />
-            ) : (
-              <div className="h-48 w-64 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-sm text-slate-600 p-4">
-                {question.imageAlt}
-              </div>
-            )}
+            {question.imageUrl &&
+              (!imageErrors['main'] ? (
+                <img
+                  src={question.imageUrl}
+                  alt={question.imageAlt || question.prompt}
+                  referrerPolicy="no-referrer"
+                  onError={() => handleImageError('main')}
+                  className="max-h-64 rounded-xl border border-slate-200 object-contain bg-white p-3 shadow-xs"
+                />
+              ) : (
+                <div className="h-48 w-64 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-sm text-slate-600 p-4">
+                  {question.imageAlt}
+                </div>
+              ))}
 
             {question.wordSearchGrid && (
               <div className="bg-teal-600 p-3 rounded-xl shadow-xs">
@@ -476,20 +486,34 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
     const allTokens = question.orderingTokens || [];
     const currentOrder: string[] = Array.isArray(answer) ? answer : [];
 
-    // Remaining tokens (handle duplicates gracefully by index if ever needed, here all tokens are unique)
-    const remainingTokens = allTokens.filter(
-      (token) => !currentOrder.includes(token)
-    );
+    // Handle duplicate tokens accurately using multiset counts
+    const usedCounts = new Map<string, number>();
+    currentOrder.forEach((t) => {
+      usedCounts.set(t, (usedCounts.get(t) || 0) + 1);
+    });
+    const remainingTokens: { token: string; poolIdx: number }[] = [];
+    allTokens.forEach((token, poolIdx) => {
+      const used = usedCounts.get(token) || 0;
+      if (used > 0) {
+        usedCounts.set(token, used - 1);
+      } else {
+        remainingTokens.push({ token, poolIdx });
+      }
+    });
 
     const handleAddToken = (token: string) => {
       if (isSubmitted) return;
       onChange([...currentOrder, token]);
     };
 
-    const handleRemoveToken = (token: string) => {
+    const handleRemoveToken = (idxToRemove: number) => {
       if (isSubmitted) return;
-      onChange(currentOrder.filter((t) => t !== token));
+      onChange(currentOrder.filter((_, idx) => idx !== idxToRemove));
     };
+
+    const joinedOrder = currentOrder.join(question.orderingJoiner ?? ' ');
+    const displayJoinedOrder =
+      question.orderingDisplayOverrides?.[joinedOrder] ?? joinedOrder;
 
     const handleSwap = (idxA: number, idxB: number) => {
       if (isSubmitted) return;
@@ -530,9 +554,9 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                 Đã đưa hết thẻ xuống khay kết quả bên dưới.
               </span>
             ) : (
-              remainingTokens.map((token) => (
+              remainingTokens.map(({ token, poolIdx }) => (
                 <button
-                  key={token}
+                  key={`${token}-${poolIdx}`}
                   type="button"
                   disabled={isSubmitted}
                   onClick={() => handleAddToken(token)}
@@ -563,11 +587,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
               <span className="text-sm font-semibold text-teal-900">
                 Kết quả ghép:{' '}
                 <strong className="underline decoration-teal-500/50">
-                  {question.id === 22
-                    ? currentOrder.join('') === 'Bànghế'
-                      ? 'Bàn ghế'
-                      : currentOrder.join('')
-                    : currentOrder.join(question.orderingJoiner ?? ' ')}
+                  {displayJoinedOrder}
                 </strong>
               </span>
             )}
@@ -581,7 +601,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
             ) : (
               currentOrder.map((token, idx) => (
                 <div
-                  key={token}
+                  key={`${token}-${idx}`}
                   className="inline-flex items-center bg-white border-2 border-teal-600 rounded-lg shadow-2xs overflow-hidden"
                 >
                   {!isSubmitted && idx > 0 && (
@@ -597,7 +617,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                   <button
                     type="button"
                     disabled={isSubmitted}
-                    onClick={() => handleRemoveToken(token)}
+                    onClick={() => handleRemoveToken(idx)}
                     title="Nhấn để bỏ thẻ này ra"
                     className="px-3.5 py-2 text-base sm:text-lg font-bold text-slate-900 hover:bg-rose-50 transition-colors cursor-pointer whitespace-nowrap"
                   >

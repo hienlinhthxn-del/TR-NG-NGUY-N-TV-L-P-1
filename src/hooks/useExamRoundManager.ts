@@ -233,14 +233,16 @@ export function calculateExamResult(
     };
   });
 
+  const actualMaxScore =
+    questions.reduce((sum, q) => sum + q.points, 0) || round.maxScore;
   const percentage =
-    round.maxScore > 0 ? Math.round((totalScore / round.maxScore) * 100) : 0;
+    actualMaxScore > 0 ? Math.round((totalScore / actualMaxScore) * 100) : 0;
 
   return {
     roundId: round.id,
     roundTitle: round.title,
     totalScore,
-    maxScore: round.maxScore,
+    maxScore: actualMaxScore,
     percentage,
     correctCount,
     wrongCount,
@@ -249,7 +251,7 @@ export function calculateExamResult(
     timeSpentSeconds,
     durationSeconds,
     passed: totalScore >= round.passingScore,
-    rankTitle: evaluateRankTitle(totalScore, round.maxScore),
+    rankTitle: evaluateRankTitle(totalScore, actualMaxScore),
     submittedAt: new Date().toLocaleString('vi-VN', {
       hour: '2-digit',
       minute: '2-digit',
@@ -274,7 +276,8 @@ export function calculateExamResult(
 export function useExamRoundManager(
   questions: Question[],
   initialRound: ExamRoundConfig = EXAM_ROUNDS[0],
-  onCompleteCallback?: (result: ExamResultSummary) => void
+  onCompleteCallback?: (result: ExamResultSummary) => void,
+  isTimerActive = true
 ) {
   const [selectedRound, setSelectedRound] =
     useState<ExamRoundConfig>(initialRound);
@@ -312,9 +315,9 @@ export function useExamRoundManager(
     [status, selectedRound, questions, answers, secondsLeft, onCompleteCallback]
   );
 
-  // Countdown Timer Effect
+  // Countdown Timer Effect (only ticks while exam workspace is active)
   useEffect(() => {
-    if (status !== 'in_progress') return;
+    if (status !== 'in_progress' || !isTimerActive) return;
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -326,14 +329,14 @@ export function useExamRoundManager(
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [status]);
+  }, [status, isTimerActive]);
 
   // Trigger auto-submit when clock reaches 00:00
   useEffect(() => {
-    if (secondsLeft === 0 && status === 'in_progress') {
+    if (secondsLeft === 0 && status === 'in_progress' && isTimerActive) {
       submitExam(true);
     }
-  }, [secondsLeft, status, submitExam]);
+  }, [secondsLeft, status, isTimerActive, submitExam]);
 
   // Start or restart a specific round
   const startRound = useCallback((round: ExamRoundConfig = selectedRound) => {

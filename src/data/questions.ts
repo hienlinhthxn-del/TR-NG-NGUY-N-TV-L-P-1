@@ -58,6 +58,8 @@ export interface Question {
   // For Ordering (Q20, Q21, Q22)
   orderingTokens?: string[];
   correctOrder?: string[];
+  alternativeOrders?: string[][];
+  orderingDisplayOverrides?: Record<string, string>;
   orderingJoiner?: string; // ' ' or '' or ' → '
   // For Categorize (Q23, Q24)
   categories?: CategorizeGroup[];
@@ -337,9 +339,9 @@ export const QUESTIONS: Question[] = [
     sentenceBefore: 'Ô chữ trên có tất cả ',
     sentenceAfter: ' từ chỉ quả.',
     hintOptions: ['2', '3', '4', '5'],
-    correctTextAnswers: ['4'],
+    correctTextAnswers: ['3'],
     explanation:
-      'Trong bảng ô chữ có tất cả 4 từ chỉ tên các loại quả: Hàng ngang số 1 có "NHÃN", hàng ngang số 3 có "MẬN", hàng ngang số 5 có "KHẾ", và cột dọc số 4 (từ hàng 2 đến hàng 3) hoặc cột 3 (Ã-O-N) / cột 4 (H-V-K-H) — cụ thể là: 1. NHÃN (hàng 1), 2. MẬN (hàng 3), 3. KHẾ (hàng 5), 4. NHO (cột 4 ngược hoặc hàng/cột ghép: N-H-O). Đáp án đúng là 4 từ chỉ quả.',
+      'Trong bảng ô chữ có tất cả 3 từ chỉ tên các loại quả xếp theo hàng ngang: 1. NHÃN (hàng 1), 2. MẬN (hàng 3), 3. KHẾ (hàng 5). Không có tên loại quả nào ở hàng dọc. Đáp án đúng là 3 từ chỉ quả.',
   },
   {
     id: 16,
@@ -463,6 +465,7 @@ export const QUESTIONS: Question[] = [
     prompt: 'Sắp xếp các tiếng sau để tạo thành câu hoàn chỉnh.',
     orderingTokens: ['ở', 'chờ', 'đò.', 'bến', 'mẹ', 'Hà'],
     correctOrder: ['Hà', 'chờ', 'mẹ', 'ở', 'bến', 'đò.'],
+    alternativeOrders: [['Mẹ', 'Hà', 'chờ', 'ở', 'bến', 'đò.']],
     orderingJoiner: ' ',
     explanation:
       'Tiếng viết hoa "Hà" đứng đầu câu, tiếng có dấu chấm "đò." đứng cuối câu. Sắp xếp các tiếng theo đúng ngữ pháp ta được câu: "Hà chờ mẹ ở bến đò." (hoặc "Mẹ Hà chờ ở bến đò." - chuẩn SGK Tiếng Việt 1: "Hà chờ mẹ ở bến đò.").',
@@ -476,6 +479,7 @@ export const QUESTIONS: Question[] = [
     prompt: 'Sắp xếp các chữ sau để tạo thành từ chỉ đồ vật.',
     orderingTokens: ['B', 'ế', 'à', 'g', 'n', 'h'],
     correctOrder: ['B', 'à', 'n', 'g', 'h', 'ế'],
+    orderingDisplayOverrides: { Bànghế: 'Bàn ghế' },
     orderingJoiner: '',
     explanation:
       'Ghép các chữ cái B, à, n, g, h, ế theo đúng thứ tự ta được từ chỉ đồ vật quen thuộc là "Bàn ghế" (B-à-n g-h-ế).',
@@ -682,17 +686,16 @@ export function checkQuestionCorrect(q: Question, ans: any): boolean {
     case 'ordering': {
       const expected = q.correctOrder || [];
       if (!Array.isArray(ans) || ans.length !== expected.length) return false;
-      // Also allow alternative valid grammar if exact tokens match
-      if (q.id === 21) {
-        const joined = ans.join(' ');
-        if (
-          joined === 'Hà chờ mẹ ở bến đò.' ||
-          joined === 'Mẹ Hà chờ ở bến đò.'
-        ) {
-          return true;
-        }
+      const matchesExpected = expected.every((val, idx) => ans[idx] === val);
+      if (matchesExpected) return true;
+      if (q.alternativeOrders && q.alternativeOrders.length > 0) {
+        return q.alternativeOrders.some(
+          (alt) =>
+            alt.length === ans.length &&
+            alt.every((val, idx) => ans[idx] === val)
+        );
       }
-      return expected.every((val, idx) => ans[idx] === val);
+      return false;
     }
     case 'categorize': {
       const items = q.categorizeItems || [];
