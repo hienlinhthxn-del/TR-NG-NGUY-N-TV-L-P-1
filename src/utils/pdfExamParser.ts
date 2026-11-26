@@ -313,7 +313,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export async function extractExamWithGeminiAI(
   buffer: ArrayBuffer,
   apiKey: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  forceMcq = true
 ): Promise<Question[]> {
   const cleanKey = apiKey.trim();
   if (!cleanKey) {
@@ -323,7 +324,17 @@ export async function extractExamWithGeminiAI(
   onProgress?.('Đang gửi file PDF lên Gemini AI để đọc cả chữ và hình ảnh...');
   const pdfBase64 = arrayBufferToBase64(buffer);
 
-  const instruction = `Bạn là chuyên gia giáo dục Tiểu học Việt Nam. Hãy đọc toàn bộ các trang trong file PDF đề thi Trạng Nguyên Tiếng Việt này (bao gồm cả văn bản, hình ảnh minh họa, bảng ô chữ, khung nối cặp, thẻ sắp xếp, hộp phân loại và ô chọn đáp án) và trích xuất CHÍNH XÁC từng câu hỏi sang mảng JSON theo đúng định dạng của đề gốc.
+  const instruction = forceMcq
+    ? `Bạn là chuyên gia giáo dục Tiểu học Việt Nam. Hãy đọc toàn bộ các trang trong file PDF đề thi Trạng Nguyên Tiếng Việt này (bao gồm cả văn bản và hình ảnh chụp màn hình) và chuyển TOÀN BỘ câu hỏi sang định dạng TRẮC NGHIỆM 4 ĐÁP ÁN (A, B, C, D) chuẩn Trạng Nguyên Tiếng Việt.
+
+Quy tắc bắt buộc:
+- Chỉ trả về mảng JSON hợp lệ, KHÔNG kèm markdown \`\`\`json hay văn bản thừa.
+- MỌI phần tử trong mảng đều có "type": "mcq", "typeLabel": "Trắc nghiệm", "points": 10 và ĐỦ 4 phương án A, B, C, D:
+  { "number": 1, "pageNumber": 1, "needsImage": false, "type": "mcq", "typeLabel": "Trắc nghiệm", "points": 10, "prompt": "...", "subPrompt": "...", "mcqOptions": [{"id":"A","text":"..."},{"id":"B","text":"..."},{"id":"C","text":"..."},{"id":"D","text":"..."}], "correctMcqId": "C", "explanation": "..." }
+- Đặt "needsImage": true nếu câu hỏi gốc có hình minh họa hoặc bảng ô chữ.
+- Nếu câu hỏi gốc là điền từ, chọn đáp án, sắp xếp hoặc giải đố, hãy chuyển khéo léo thành câu trắc nghiệm 4 đáp án A, B, C, D (1 đáp án đúng và 3 phương án nhiễu hợp lý cho học sinh lớp 1).
+- Giữ nguyên nội dung tiếng Việt trong PDF, giải chính xác 100% "correctMcqId" và viết lời giải thích ngắn gọn, dễ hiểu.`
+    : `Bạn là chuyên gia giáo dục Tiểu học Việt Nam. Hãy đọc toàn bộ các trang trong file PDF đề thi Trạng Nguyên Tiếng Việt này (bao gồm cả văn bản, hình ảnh minh họa, bảng ô chữ, khung nối cặp, thẻ sắp xếp, hộp phân loại và ô chọn đáp án) và trích xuất CHÍNH XÁC từng câu hỏi sang mảng JSON theo đúng định dạng của đề gốc.
 
 Quy tắc bắt buộc:
 - Chỉ trả về JSON hợp lệ (mảng các đối tượng Question), KHÔNG kèm markdown \`\`\`json hay văn bản thừa.
@@ -485,6 +496,73 @@ function shouldAttachImageToQuestion(
   return Boolean(hasVisualArea);
 }
 
+function ensureFourMcqOptions(
+  options: { id: string; text: string }[]
+): { id: string; text: string }[] {
+  const ids = ['A', 'B', 'C', 'D'];
+  return ids.map((id, i) => {
+    const found = options.find((o) => o.id === id) || options[i];
+    return {
+      id,
+      text: found?.text?.trim() || `Phương án ${id}`,
+    };
+  });
+}
+
+function convertQuestionToMcq(q: Question): Question {
+  if (q.type === 'mcq' && q.mcqOptions && q.mcqOptions.length >= 2) {
+    return {
+      ...q,
+      type: 'mcq',
+      typeLabel: q.imageUrl ? 'Trắc nghiệm hình ảnh' : 'Trắc nghiệm',
+      mcqOptions: ensureFourMcqOptions(q.mcqOptions),
+      correctMcqId: q.correctMcqId || 'A',
+    };
+  }
+
+  let candidateTexts: string[] = [];
+  if (q.dropdownOptions && q.dropdownOptions.length > 0) {
+    candidateTexts = [...q.dropdownOptions];
+  } else if (q.hintOptions && q.hintOptions.length > 0) {
+    candidateTexts = [...q.hintOptions];
+  } else if (q.correctTextAnswers && q.correctTextAnswers.length > 0) {
+    candidateTexts = [q.correctTextAnswers[0]];
+  } else if (q.correctOrder && q.correctOrder.length > 0) {
+    candidateTexts = [q.correctOrder.join(q.orderingJoiner ?? ' ')];
+  }
+
+  const ids = ['A', 'B', 'C', 'D'];
+  const mcqOptions = ids.map((id, i) => ({
+    id,
+    text: candidateTexts[i] || `Phương án ${id}`,
+  }));
+
+  const subPrompt =
+    q.subPrompt ||
+    (q.sentenceBefore || q.sentenceAfter
+      ? `${q.sentenceBefore || ''}[...]${q.sentenceAfter || ''}`.trim()
+      : q.poemLines
+      ? q.poemLines.join(' / ')
+      : undefined);
+
+  return {
+    id: q.id,
+    number: q.number,
+    type: 'mcq',
+    typeLabel: q.imageUrl ? 'Trắc nghiệm hình ảnh' : 'Trắc nghiệm',
+    points: q.points || 10,
+    prompt: q.prompt,
+    subPrompt,
+    imageUrl: q.imageUrl,
+    imageAlt: q.imageAlt,
+    mcqOptions,
+    correctMcqId: 'A',
+    explanation:
+      q.explanation ||
+      'Đáp án đúng là phương án A. (Giáo viên hãy chọn lại đáp án đúng nếu cần.)',
+  };
+}
+
 /**
  * Parse a single question text block into one of the 6 TNTV Question formats
  */
@@ -499,7 +577,12 @@ function parseSingleBlockToQuestion(
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(QUESTION_HEADER_LINE_REGEX, '')
-    .replace(/(?:^|\s)[○◯◎oO0©@\(\[]\s*([A-D])\s*[.)]/gm, ' $1. ')
+    // Normalize OCR radio button glyphs before A. / B. / C. / D. (e.g. "○A.", "OA.", "0 A)", "© A.")
+    .replace(
+      /(?:^|\s)[○◯◎oO0©@\(\[\{\|•·\-–—]{1,3}\s*([A-D])\s*[.):,]\s*/gm,
+      ' $1. '
+    )
+    .replace(/(?:^|\s)(\*?[A-D])\s*[.):]\s*/gm, ' $1. ')
     .trim();
 
   let detectedAnswer = '';
@@ -938,13 +1021,16 @@ function parseSingleBlockToQuestion(
  */
 export function parseVietnameseExamText(
   rawText: string,
-  segments?: PdfQuestionSegment[]
+  segments?: PdfQuestionSegment[],
+  forceMcq = true
 ): Question[] {
   const baseId = Date.now() * 1000;
 
+  let results: Question[] = [];
+
   // Prefer structured per-question segments with cropped images when available from OCR
   if (segments && segments.length > 0) {
-    return segments.map((seg, idx) =>
+    results = segments.map((seg, idx) =>
       parseSingleBlockToQuestion(
         seg.text,
         idx + 1,
@@ -953,46 +1039,48 @@ export function parseVietnameseExamText(
         seg.hasVisualArea
       )
     );
-  }
-
-  const normalized = rawText
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trim();
-
-  if (!normalized) return [];
-
-  const questionHeaderRegex =
-    /(?:^|\n)\s*(?:Câu\s+hỏi|Câu|Bài)\s*(\d{1,2})\s*[:.)\-]?(?:\s+|\n)/gi;
-
-  const matches: { index: number; headerLen: number; num: number }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = questionHeaderRegex.exec(normalized)) !== null) {
-    matches.push({
-      index: m.index,
-      headerLen: m[0].length,
-      num: parseInt(m[1], 10),
-    });
-  }
-
-  const blocks: string[] = [];
-  if (matches.length > 0) {
-    for (let i = 0; i < matches.length; i++) {
-      const start = matches[i].index + matches[i].headerLen;
-      const end =
-        i + 1 < matches.length ? matches[i + 1].index : normalized.length;
-      const content = normalized.slice(start, end).trim();
-      if (content) blocks.push(content);
-    }
   } else {
-    normalized
-      .split(/\n{2,}/)
-      .map((s) => s.trim())
-      .filter((s) => s.length >= 8)
-      .forEach((b) => blocks.push(b));
+    const normalized = rawText
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim();
+
+    if (!normalized) return [];
+
+    const questionHeaderRegex =
+      /(?:^|\n)\s*(?:Câu\s+hỏi|Câu|Bài)\s*(\d{1,2})\s*[:.)\-]?(?:\s+|\n)/gi;
+
+    const matches: { index: number; headerLen: number; num: number }[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = questionHeaderRegex.exec(normalized)) !== null) {
+      matches.push({
+        index: m.index,
+        headerLen: m[0].length,
+        num: parseInt(m[1], 10),
+      });
+    }
+
+    const blocks: string[] = [];
+    if (matches.length > 0) {
+      for (let i = 0; i < matches.length; i++) {
+        const start = matches[i].index + matches[i].headerLen;
+        const end =
+          i + 1 < matches.length ? matches[i + 1].index : normalized.length;
+        const content = normalized.slice(start, end).trim();
+        if (content) blocks.push(content);
+      }
+    } else {
+      normalized
+        .split(/\n{2,}/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 8)
+        .forEach((b) => blocks.push(b));
+    }
+
+    results = blocks.map((block, idx) =>
+      parseSingleBlockToQuestion(block, idx + 1, baseId)
+    );
   }
 
-  return blocks.map((block, idx) =>
-    parseSingleBlockToQuestion(block, idx + 1, baseId)
-  );
+  return forceMcq ? results.map(convertQuestionToMcq) : results;
 }

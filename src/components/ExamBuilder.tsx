@@ -27,7 +27,9 @@ import {
   extractTextFromPdfBuffer,
   extractExamWithGeminiAI,
   parseVietnameseExamText,
+  PdfQuestionSegment,
 } from '../utils/pdfExamParser';
+import { QuestionRenderer } from './QuestionRenderer';
 
 const GEMINI_KEY_STORAGE = 'tntv_teacher_gemini_api_key';
 
@@ -62,6 +64,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
   // --- Mode PDF: Import from PDF File State ---
   const pdfFileInputRef = useRef<HTMLInputElement | null>(null);
   const lastPdfBufferRef = useRef<ArrayBuffer | null>(null);
+  const lastPdfSegmentsRef = useRef<PdfQuestionSegment[]>([]);
   const [pdfDeckTitle, setPdfDeckTitle] = useState<string>(
     'Đề Thi Trích Xuất Từ File PDF'
   );
@@ -77,6 +80,8 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
   const [pdfProgressMsg, setPdfProgressMsg] = useState<string>('');
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfParseEngine, setPdfParseEngine] = useState<'ocr' | 'gemini'>('ocr');
+  const [pdfForceMcq, setPdfForceMcq] = useState<boolean>(true);
+  const [pdfListView, setPdfListView] = useState<'preview' | 'edit'>('preview');
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     try {
       return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
@@ -492,11 +497,12 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         const aiQuestions = await extractExamWithGeminiAI(
           buffer,
           geminiApiKey,
-          (msg) => setPdfProgressMsg(msg)
+          (msg) => setPdfProgressMsg(msg),
+          pdfForceMcq
         );
         setPdfParsedQuestions(aiQuestions);
         setStatusMessage(
-          `Gemini AI đã trích xuất thành công ${aiQuestions.length} câu hỏi chuẩn từ "${displayName}" kèm đáp án & giải thích!`
+          `Gemini AI đã trích xuất thành công ${aiQuestions.length} câu hỏi chuẩn Trạng Nguyên từ "${displayName}"!`
         );
         setTimeout(() => setStatusMessage(null), 6000);
         return;
@@ -508,6 +514,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         );
       setPdfPageCount(pageCount);
       setPdfRawText(rawText);
+      lastPdfSegmentsRef.current = segments;
 
       if (!rawText.trim() && segments.length === 0) {
         setPdfParsedQuestions([]);
@@ -518,7 +525,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         return;
       }
 
-      const questions = parseVietnameseExamText(rawText, segments);
+      const questions = parseVietnameseExamText(rawText, segments, pdfForceMcq);
       setPdfParsedQuestions(questions);
       if (questions.length === 0) {
         setShowRawTextEditor(true);
@@ -580,9 +587,15 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
     }
   };
 
-  const handleReparsePdfText = () => {
+  const handleReparsePdfText = (overrideForceMcq?: boolean) => {
     setPdfError(null);
-    const questions = parseVietnameseExamText(pdfRawText);
+    const useForceMcq =
+      typeof overrideForceMcq === 'boolean' ? overrideForceMcq : pdfForceMcq;
+    const questions = parseVietnameseExamText(
+      pdfRawText,
+      lastPdfSegmentsRef.current,
+      useForceMcq
+    );
     setPdfParsedQuestions(questions);
     if (questions.length === 0) {
       setPdfError(
@@ -777,8 +790,54 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
               </div>
             </div>
 
-            {/* Extraction Engine Selector: Free OCR vs Gemini AI Vision */}
+            {/* Extraction Engine & Output Format Selector */}
             <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-800">
+                  Định dạng câu hỏi đầu ra:
+                </span>
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPdfForceMcq(true);
+                      if (
+                        pdfRawText.trim() ||
+                        lastPdfSegmentsRef.current.length > 0
+                      ) {
+                        handleReparsePdfText(true);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+                      pdfForceMcq
+                        ? 'bg-teal-700 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Chuẩn Trắc nghiệm 4 đáp án (A, B, C, D)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPdfForceMcq(false);
+                      if (
+                        pdfRawText.trim() ||
+                        lastPdfSegmentsRef.current.length > 0
+                      ) {
+                        handleReparsePdfText(false);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+                      !pdfForceMcq
+                        ? 'bg-white text-teal-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Đa dạng 6 dạng bài
+                  </button>
+                </div>
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-800">
                   Chọn công nghệ đọc file PDF:
@@ -968,7 +1027,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={handleReparsePdfText}
+                      onClick={() => handleReparsePdfText()}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -979,24 +1038,80 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
               )}
             </div>
 
-            {/* Parsed Questions Review & Quick-Edit List */}
+            {/* Parsed Questions Review & Live Trạng Nguyên Preview */}
             {pdfParsedQuestions.length > 0 && (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <h4 className="text-sm font-bold text-slate-900">
-                    Danh sách câu hỏi đã trích xuất ({pdfParsedQuestions.length}{' '}
-                    câu · {pdfParsedQuestions.length * 10} điểm) — Kiểm tra & chọn đáp án đúng:
+                    Đề đã trích xuất ({pdfParsedQuestions.length} câu ·{' '}
+                    {pdfParsedQuestions.length * 10} điểm):
                   </h4>
-                  <button
-                    type="button"
-                    onClick={handleMovePdfQuestionsToManual}
-                    className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
-                  >
-                    Chuyển sang mục Tự soạn để thêm/chỉnh sâu →
-                  </button>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setPdfListView('preview')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+                          pdfListView === 'preview'
+                            ? 'bg-teal-700 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Xem giao diện Trạng Nguyên
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPdfListView('edit')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-colors ${
+                          pdfListView === 'edit'
+                            ? 'bg-white text-teal-900 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Chỉnh sửa câu hỏi &amp; đáp án
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleMovePdfQuestionsToManual}
+                      className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+                    >
+                      Đưa sang Tự soạn →
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                {pdfListView === 'preview' ? (
+                  <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1">
+                    {pdfParsedQuestions.map((q, idx) => (
+                      <div key={q.id} className="space-y-2">
+                        <QuestionRenderer
+                          question={{ ...q, number: idx + 1 }}
+                          answer={
+                            q.type === 'mcq'
+                              ? q.correctMcqId
+                              : q.type === 'fill_text' || q.type === 'dropdown'
+                              ? q.correctTextAnswers?.[0]
+                              : undefined
+                          }
+                          onChange={(val) => {
+                            if (q.type === 'mcq' && typeof val === 'string') {
+                              handleUpdatePdfQuestion(idx, (old) => ({
+                                ...old,
+                                correctMcqId: val,
+                                explanation: `Đáp án đúng là phương án ${val}.`,
+                              }));
+                            }
+                          }}
+                          isSubmitted={false}
+                          instantFeedback={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
                   {pdfParsedQuestions.map((q, idx) => (
                     <div
                       key={q.id}
@@ -1345,7 +1460,8 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
                       )}
                     </div>
                   ))}
-                </div>
+                  </div>
+                )}
 
                 {/* Save PDF Deck Buttons */}
                 <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-slate-100">
