@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   PlusCircle,
   Shuffle,
@@ -10,6 +10,12 @@ import {
   Clock,
   BookOpen,
   RotateCcw,
+  FileUp,
+  FileText,
+  Loader2,
+  Sparkles,
+  Eye,
+  AlertCircle,
 } from 'lucide-react';
 import { Question, QuestionType, QUESTIONS } from '../data/questions';
 import {
@@ -17,6 +23,10 @@ import {
   DECK_2_QUESTIONS,
   generateRandomizedDeck,
 } from '../data/examDecks';
+import {
+  extractTextFromPdfBuffer,
+  parseVietnameseExamText,
+} from '../utils/pdfExamParser';
 
 interface ExamBuilderProps {
   allDecks: ExamDeck[];
@@ -42,9 +52,33 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
   onSaveNewDeck,
   onDeleteCustomDeck,
 }) => {
-  const [builderMode, setBuilderMode] = useState<'auto' | 'manual' | 'list'>(
-    'auto'
+  const [builderMode, setBuilderMode] = useState<
+    'auto' | 'pdf' | 'manual' | 'list'
+  >('auto');
+
+  // --- Mode PDF: Import from PDF File State ---
+  const pdfFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pdfDeckTitle, setPdfDeckTitle] = useState<string>(
+    'Đề Thi Trích Xuất Từ File PDF'
   );
+  const [pdfDuration, setPdfDuration] = useState<number>(30);
+  const [pdfFileName, setPdfFileName] = useState<string>('');
+  const [pdfPageCount, setPdfPageCount] = useState<number>(0);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [showPdfPreview, setShowPdfPreview] = useState<boolean>(false);
+  const [pdfRawText, setPdfRawText] = useState<string>('');
+  const [showRawTextEditor, setShowRawTextEditor] = useState<boolean>(false);
+  const [pdfParsedQuestions, setPdfParsedQuestions] = useState<Question[]>([]);
+  const [isParsingPdf, setIsParsingPdf] = useState<boolean>(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pdfPreviewUrl && pdfPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(pdfPreviewUrl);
+      }
+    };
+  }, [pdfPreviewUrl]);
 
   // --- Mode 1: Auto Generator State ---
   const [autoTitle, setAutoTitle] = useState<string>(
@@ -400,6 +434,179 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
     }
   };
 
+  // --- PDF Upload & Parsing Handlers ---
+  const processPdfArrayBuffer = async (
+    buffer: ArrayBuffer,
+    displayName: string,
+    previewUrl: string | null
+  ) => {
+    setIsParsingPdf(true);
+    setPdfError(null);
+    setPdfFileName(displayName);
+    if (previewUrl) {
+      setPdfPreviewUrl((prev) => {
+        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return previewUrl;
+      });
+    }
+    const cleanTitle = displayName
+      .replace(/\.pdf$/i, '')
+      .replace(/[_-]+/g, ' ')
+      .trim();
+    if (cleanTitle) {
+      setPdfDeckTitle(`Đề PDF: ${cleanTitle}`);
+    }
+
+    try {
+      const { pageCount, rawText } = await extractTextFromPdfBuffer(buffer);
+      setPdfPageCount(pageCount);
+      setPdfRawText(rawText);
+
+      if (!rawText.trim()) {
+        setPdfParsedQuestions([]);
+        setShowRawTextEditor(true);
+        setPdfError(
+          'File PDF này có thể là file ảnh chụp (scan) chưa có lớp chữ. Giáo viên có thể dán nội dung câu hỏi vào ô văn bản bên dưới rồi nhấn "Phân tích lại thành câu hỏi".'
+        );
+        return;
+      }
+
+      const questions = parseVietnameseExamText(rawText);
+      setPdfParsedQuestions(questions);
+      if (questions.length === 0) {
+        setShowRawTextEditor(true);
+        setPdfError(
+          'Không tìm thấy câu hỏi theo mẫu "Câu 1.", "Câu 2." trong PDF. Hãy kiểm tra hoặc chỉnh sửa văn bản trích xuất bên dưới rồi nhấn "Phân tích lại".'
+        );
+      } else {
+        setStatusMessage(
+          `Đã đọc ${pageCount} trang PDF và tự động tách được ${questions.length} câu hỏi! Hãy rà soát đáp án rồi lưu bộ đề.`
+        );
+        setTimeout(() => setStatusMessage(null), 5000);
+      }
+    } catch (err: any) {
+      setPdfError(
+        err?.message ||
+          'Có lỗi khi đọc file PDF. Vui lòng thử lại với file PDF khác.'
+      );
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
+  const handlePdfFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setPdfError('Vui lòng chọn đúng tệp định dạng .pdf');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const buffer = await file.arrayBuffer();
+    await processPdfArrayBuffer(buffer, file.name, objectUrl);
+    e.target.value = '';
+  };
+
+  const handleLoadSampleOriginalPdf = async () => {
+    setIsParsingPdf(true);
+    setPdfError(null);
+    const sampleUrl = '/assets/aistudio/____N_LUY_N_TNTV_C_P_TR__NG_b154e10e.pdf';
+    try {
+      const resp = await fetch(sampleUrl);
+      if (!resp.ok) throw new Error('Không tải được file PDF đề gốc mẫu.');
+      const buffer = await resp.arrayBuffer();
+      await processPdfArrayBuffer(
+        buffer,
+        'Đề Ôn Luyện TNTV Cấp Trường (PDF gốc)',
+        sampleUrl
+      );
+    } catch (err: any) {
+      setIsParsingPdf(false);
+      setPdfError(err?.message || 'Không thể tải file PDF mẫu.');
+    }
+  };
+
+  const handleReparsePdfText = () => {
+    setPdfError(null);
+    const questions = parseVietnameseExamText(pdfRawText);
+    setPdfParsedQuestions(questions);
+    if (questions.length === 0) {
+      setPdfError(
+        'Chưa tách được câu hỏi nào. Hãy đảm bảo mỗi câu bắt đầu bằng "Câu 1.", "Câu 2."...'
+      );
+    } else {
+      setStatusMessage(`Đã phân tích lại thành ${questions.length} câu hỏi!`);
+      setTimeout(() => setStatusMessage(null), 3500);
+    }
+  };
+
+  const handleUpdatePdfQuestion = (
+    idx: number,
+    updater: (q: Question) => Question
+  ) => {
+    setPdfParsedQuestions((prev) =>
+      prev.map((q, i) => (i === idx ? updater(q) : q))
+    );
+  };
+
+  const handleMovePdfQuestionsToManual = () => {
+    if (pdfParsedQuestions.length === 0) return;
+    setManualTitle(pdfDeckTitle);
+    setManualDuration(pdfDuration);
+    setManualQuestions((prev) => {
+      const startNum = prev.length;
+      return [
+        ...prev,
+        ...pdfParsedQuestions.map((q, i) => ({
+          ...q,
+          number: startNum + i + 1,
+        })),
+      ];
+    });
+    setBuilderMode('manual');
+    setStatusMessage(
+      `Đã chuyển ${pdfParsedQuestions.length} câu hỏi từ PDF sang mục Tự soạn để chỉnh sửa chi tiết.`
+    );
+    setTimeout(() => setStatusMessage(null), 4000);
+  };
+
+  const handleSavePdfDeck = (startNow: boolean) => {
+    if (pdfParsedQuestions.length === 0) {
+      setPdfError('Chưa có câu hỏi nào được trích xuất từ PDF để lưu.');
+      return;
+    }
+    const numbered = pdfParsedQuestions.map((q, i) => ({
+      ...q,
+      number: i + 1,
+    }));
+    const newDeck: ExamDeck = {
+      id: `deck-pdf-${Date.now()}`,
+      title:
+        pdfDeckTitle.trim() ||
+        `Đề Thi Từ PDF (${numbered.length} câu hỏi)`,
+      subtitle: `${numbered.length} câu hỏi trích xuất từ ${
+        pdfFileName || 'file PDF'
+      } · ${pdfDuration} phút`,
+      durationMinutes: pdfDuration,
+      passingScore: Math.round(numbered.length * 10 * 0.6),
+      createdAt: new Date().toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+      }),
+      isCustom: true,
+      questions: numbered,
+    };
+    onSaveNewDeck(newDeck, startNow);
+    if (!startNow) {
+      setStatusMessage(`Đã lưu bộ đề PDF "${newDeck.title}" vào Kho đề thi!`);
+      setBuilderMode('list');
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header & Mode Switcher */}
@@ -414,12 +621,24 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
               Tạo Đề Thi Trạng Nguyên Tiếng Việt Mới
             </h1>
             <p className="text-sm text-slate-600 mt-1">
-              Sinh đề ngẫu nhiên từ ngân hàng 60 câu hỏi chuẩn hoặc tự biên soạn câu hỏi mới theo đúng 6 dạng bài tương tác.
+              Tải lên file PDF đề thi để tạo đề tương tác, sinh đề ngẫu nhiên từ ngân hàng 60 câu hỏi chuẩn hoặc tự biên soạn câu hỏi mới.
             </p>
           </div>
 
-          {/* 3-Tab Mode Selector */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+          {/* 4-Tab Mode Selector */}
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setBuilderMode('pdf')}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                builderMode === 'pdf'
+                  ? 'bg-white text-teal-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileUp className="w-4 h-4" />
+              Tạo đề từ PDF
+            </button>
             <button
               type="button"
               onClick={() => setBuilderMode('auto')}
@@ -469,6 +688,354 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
             >
               Đóng
             </button>
+          </div>
+        )}
+
+        {/* ==================== TAB PDF: IMPORT EXAM FROM PDF FILE ==================== */}
+        {builderMode === 'pdf' && (
+          <div className="space-y-6">
+            {/* Deck Settings */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tên bộ đề tạo từ PDF
+                </label>
+                <input
+                  type="text"
+                  value={pdfDeckTitle}
+                  onChange={(e) => setPdfDeckTitle(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold focus:outline-none focus:border-teal-600"
+                  placeholder="Ví dụ: Đề Ôn Luyện TNTV Cấp Trường Số 3"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Thời gian làm bài (phút)
+                </label>
+                <input
+                  type="number"
+                  min={5}
+                  max={90}
+                  value={pdfDuration}
+                  onChange={(e) =>
+                    setPdfDuration(Math.max(5, Number(e.target.value) || 30))
+                  }
+                  className="w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-bold tabular-nums focus:outline-none focus:border-teal-600"
+                />
+              </div>
+            </div>
+
+            {/* PDF Upload Dropzone */}
+            <div className="p-6 rounded-2xl border-2 border-dashed border-teal-500/70 bg-teal-50/30 text-center space-y-4">
+              <input
+                ref={pdfFileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handlePdfFileChange}
+                className="hidden"
+              />
+              <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center mx-auto">
+                {isParsingPdf ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <FileUp className="w-6 h-6" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  {isParsingPdf
+                    ? 'Đang đọc và phân tích nội dung file PDF...'
+                    : pdfFileName
+                    ? `Đã tải file: ${pdfFileName} (${pdfPageCount} trang)`
+                    : 'Tải lên file PDF đề thi Trạng Nguyên Tiếng Việt'}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
+                  Hệ thống tự động trích xuất câu hỏi theo định dạng <strong>Câu 1., Câu 2., ...</strong> cùng các phương án <strong>A. B. C. D.</strong>, câu điền từ và câu sắp xếp ngay trên trình duyệt.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  disabled={isParsingPdf}
+                  onClick={() => pdfFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <FileUp className="w-4 h-4" />
+                  Chọn file PDF từ máy tính
+                </button>
+                <button
+                  type="button"
+                  disabled={isParsingPdf}
+                  onClick={handleLoadSampleOriginalPdf}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-teal-700 bg-white hover:bg-teal-50 text-teal-800 text-xs sm:text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Thử trích xuất từ Đề PDF gốc mẫu
+                </button>
+                {pdfPreviewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPdfPreview((prev) => !prev)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold cursor-pointer"
+                  >
+                    <Eye className="w-4 h-4" />
+                    {showPdfPreview ? 'Ẩn xem trước PDF' : 'Xem trước PDF'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {pdfError && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-sm flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <span>{pdfError}</span>
+              </div>
+            )}
+
+            {/* Optional Embedded PDF Preview */}
+            {showPdfPreview && pdfPreviewUrl && (
+              <div className="w-full h-[520px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                <iframe
+                  src={pdfPreviewUrl}
+                  title="Xem trước file PDF tải lên"
+                  className="w-full h-full"
+                />
+              </div>
+            )}
+
+            {/* Toggleable Raw Text Editor (also lets teacher paste text directly) */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2 text-xs font-bold text-slate-700">
+                  <FileText className="w-4 h-4 text-teal-700" />
+                  Văn bản trích xuất từ PDF (có thể dán hoặc chỉnh sửa trực tiếp)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowRawTextEditor((prev) => !prev)}
+                  className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+                >
+                  {showRawTextEditor ? 'Thu gọn văn bản' : 'Mở ô chỉnh sửa văn bản'}
+                </button>
+              </div>
+              {showRawTextEditor && (
+                <div className="p-4 bg-white space-y-3 border-t border-slate-200">
+                  <textarea
+                    rows={8}
+                    value={pdfRawText}
+                    onChange={(e) => setPdfRawText(e.target.value)}
+                    placeholder={`Ví dụ:\nCâu 1. Tiếng nào mang thanh huyền?\nA. ghế   B. tủ   C. bàn   D. đĩa\nĐáp án: C\n\nCâu 2. Điền "g" hoặc "gh": Cô Hà cho đàn ...à ăn.\nĐáp án: g`}
+                    className="w-full p-3 rounded-lg border border-slate-300 text-xs sm:text-sm font-mono leading-relaxed focus:outline-none focus:border-teal-600"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleReparsePdfText}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Phân tích lại thành câu hỏi
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Parsed Questions Review & Quick-Edit List */}
+            {pdfParsedQuestions.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Danh sách câu hỏi đã trích xuất ({pdfParsedQuestions.length}{' '}
+                    câu · {pdfParsedQuestions.length * 10} điểm) — Kiểm tra & chọn đáp án đúng:
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleMovePdfQuestionsToManual}
+                    className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+                  >
+                    Chuyển sang mục Tự soạn để thêm/chỉnh sâu →
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                  {pdfParsedQuestions.map((q, idx) => (
+                    <div
+                      key={q.id}
+                      className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="px-2 py-0.5 rounded bg-teal-700 text-white font-bold tabular-nums">
+                              Câu {idx + 1}
+                            </span>
+                            <span className="font-semibold text-slate-600">
+                              {q.typeLabel}
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            value={q.prompt}
+                            onChange={(e) =>
+                              handleUpdatePdfQuestion(idx, (old) => ({
+                                ...old,
+                                prompt: e.target.value,
+                              }))
+                            }
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-900"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPdfParsedQuestions((prev) =>
+                              prev.filter((_, i) => i !== idx)
+                            )
+                          }
+                          title="Xóa câu này"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {q.type === 'mcq' && q.mcqOptions && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {q.mcqOptions.map((opt, optIdx) => {
+                            const isCorrect = q.correctMcqId === opt.id;
+                            return (
+                              <div
+                                key={opt.id}
+                                className="flex items-center gap-2"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdatePdfQuestion(idx, (old) => ({
+                                      ...old,
+                                      correctMcqId: opt.id,
+                                      explanation: `Đáp án đúng là phương án ${opt.id}.`,
+                                    }))
+                                  }
+                                  title="Nhấn để đánh dấu đáp án đúng"
+                                  className={`w-7 h-7 rounded-full text-xs font-bold shrink-0 cursor-pointer ${
+                                    isCorrect
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-white border border-slate-300 text-slate-700'
+                                  }`}
+                                >
+                                  {opt.id}
+                                </button>
+                                <input
+                                  type="text"
+                                  value={opt.text}
+                                  onChange={(e) =>
+                                    handleUpdatePdfQuestion(idx, (old) => ({
+                                      ...old,
+                                      mcqOptions: old.mcqOptions?.map((o, i) =>
+                                        i === optIdx
+                                          ? { ...o, text: e.target.value }
+                                          : o
+                                      ),
+                                    }))
+                                  }
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {q.type === 'fill_text' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="block font-semibold text-slate-600 mb-1">
+                              Nội dung câu có chỗ trống:
+                            </label>
+                            <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700">
+                              {q.sentenceBefore}
+                              <strong className="text-emerald-700 mx-1">
+                                [{q.correctTextAnswers?.[0] || '...'}]
+                              </strong>
+                              {q.sentenceAfter}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-emerald-700 mb-1">
+                              Đáp án đúng cần điền:
+                            </label>
+                            <input
+                              type="text"
+                              value={q.correctTextAnswers?.[0] || ''}
+                              onChange={(e) =>
+                                handleUpdatePdfQuestion(idx, (old) => ({
+                                  ...old,
+                                  correctTextAnswers: [e.target.value],
+                                  explanation: `Đáp án đúng là "${e.target.value}".`,
+                                }))
+                              }
+                              className="w-full px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-white text-sm font-bold"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {q.type === 'ordering' && (
+                        <div className="text-xs">
+                          <label className="block font-semibold text-emerald-700 mb-1">
+                            Câu / thứ tự đúng hoàn chỉnh:
+                          </label>
+                          <input
+                            type="text"
+                            value={(q.correctOrder || []).join(
+                              q.orderingJoiner ?? ' '
+                            )}
+                            onChange={(e) => {
+                              const words = e.target.value
+                                .trim()
+                                .split(/\s+/)
+                                .filter(Boolean);
+                              handleUpdatePdfQuestion(idx, (old) => ({
+                                ...old,
+                                correctOrder: words,
+                                orderingTokens:
+                                  words.length >= 2
+                                    ? [...words].reverse()
+                                    : old.orderingTokens,
+                                explanation: `Thứ tự đúng: "${words.join(' ')}"`,
+                              }));
+                            }}
+                            className="w-full px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-white text-sm font-semibold"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Save PDF Deck Buttons */}
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleSavePdfDeck(false)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-teal-700 text-teal-800 font-bold text-sm hover:bg-teal-50 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    Lưu bộ đề PDF vào Kho
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSavePdfDeck(true)}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-700 text-white font-bold text-sm hover:bg-teal-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <Play className="w-4 h-4" />
+                    Lưu &amp; Làm đề PDF này ngay ({pdfParsedQuestions.length} câu)
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
