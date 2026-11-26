@@ -16,8 +16,6 @@ import {
   Play,
   FileCode2,
   CheckCircle2,
-  FilePlus2,
-  Shuffle,
   LogOut,
   LogIn,
   UserPlus,
@@ -30,7 +28,6 @@ import {
 import {
   ExamDeck,
   BUILTIN_EXAM_DECKS,
-  generateRandomizedDeck,
 } from './data/examDecks';
 import { QuestionRenderer } from './components/QuestionRenderer';
 import {
@@ -55,7 +52,6 @@ import {
 type ActiveSection =
   | 'lobby'
   | 'exam'
-  | 'create_exam'
   | 'guide'
   | 'pdf_source'
   | 'history'
@@ -385,31 +381,6 @@ export default function App() {
     setActiveSection('exam');
   };
 
-  const handleQuickGenerateNewDeck = () => {
-    const randomDeck = generateRandomizedDeck({
-      title: `Đề Ngẫu Nhiên Cấp Trường #${customDecks.length + 1}`,
-      questionCount: 30,
-      durationMinutes: 30,
-      includedTypes: [
-        'mcq',
-        'fill_text',
-        'matching',
-        'ordering',
-        'categorize',
-        'dropdown',
-      ],
-      shuffleOptions: true,
-    });
-    const updated = [randomDeck, ...customDecks];
-    setCustomDecks(updated);
-    try {
-      localStorage.setItem(STORAGE_CUSTOM_DECKS_KEY, JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
-    handleResetExam(examMode, selectedRound, randomDeck);
-  };
-
   const handleSaveNewDeck = (newDeck: ExamDeck, startImmediately: boolean) => {
     const updated = [newDeck, ...customDecks];
     setCustomDecks(updated);
@@ -497,18 +468,18 @@ export default function App() {
               Làm bài thi
             </a>
             <a
-              href="#create_exam"
+              href="#guide"
               onClick={(e) => {
                 e.preventDefault();
-                setActiveSection('create_exam');
+                setActiveSection('guide');
               }}
               className={`hover:text-teal-800 transition-colors whitespace-nowrap shrink-0 py-1 ${
-                activeSection === 'create_exam'
+                activeSection === 'guide'
                   ? 'text-teal-800 font-bold underline underline-offset-8 decoration-2 decoration-teal-700'
                   : ''
               }`}
             >
-              Tạo đề mới
+              Ôn kiến thức
             </a>
             <a
               href="#history"
@@ -574,13 +545,17 @@ export default function App() {
         {[
           { id: 'lobby', label: 'Chọn vòng thi' },
           { id: 'exam', label: `Làm bài (${activeQuestions.length} câu)` },
-          { id: 'create_exam', label: '+ Tạo đề mới' },
+          { id: 'guide', label: 'Ôn kiến thức' },
           { id: 'history', label: 'Bảng vàng' },
           {
             id: 'account',
-            label: currentUser ? 'Hồ sơ Tài khoản' : 'Đăng nhập / Đăng ký',
+            label:
+              currentUser?.role === 'teacher'
+                ? 'Trang Giáo viên'
+                : currentUser
+                ? 'Hồ sơ Tài khoản'
+                : 'Đăng nhập / Đăng ký',
           },
-          { id: 'guide', label: 'Ôn kiến thức' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -599,13 +574,24 @@ export default function App() {
 
       {/* Main Content Container */}
       <main className="flex-1 max-w-[1360px] w-full mx-auto px-4 sm:px-8 py-6">
-        {/* ==================== SECTION: ACCOUNT CENTER (ĐĂNG NHẬP / ĐĂNG KÝ / ĐĂNG XUẤT) ==================== */}
+        {/* ==================== SECTION: ACCOUNT CENTER (ĐĂNG NHẬP / ĐĂNG KÝ / TRANG GIÁO VIÊN) ==================== */}
         {activeSection === 'account' && (
           <AccountCenter
             key={accountInitialTab}
             currentUser={currentUser}
             accounts={accounts}
             examHistory={history}
+            examBuilderNode={
+              <ExamBuilder
+                allDecks={allDecks}
+                activeDeckId={activeDeck.id}
+                onSelectAndStartDeck={(deck, mode) =>
+                  handleResetExam(mode, selectedRound, deck)
+                }
+                onSaveNewDeck={handleSaveNewDeck}
+                onDeleteCustomDeck={handleDeleteCustomDeck}
+              />
+            }
             initialTab={accountInitialTab}
             onLoginSuccess={handleLoginSuccess}
             onRegisterSuccess={handleRegisterSuccess}
@@ -655,14 +641,6 @@ export default function App() {
                   >
                     <UserPlus className="w-3.5 h-3.5 text-amber-700" />
                     Tạo tài khoản mới
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSection('create_exam')}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 text-xs font-bold hover:bg-teal-100 cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <FilePlus2 className="w-4 h-4" />
-                    Tạo đề thi mới
                   </button>
                 </div>
               </div>
@@ -728,14 +706,6 @@ export default function App() {
                   <label className="text-sm font-bold text-slate-800">
                     1. Chọn Bộ đề thi ({allDecks.length} bộ đề hiện có):
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleQuickGenerateNewDeck}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:underline cursor-pointer"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" />
-                    Sinh nhanh đề 30 câu ngẫu nhiên mới
-                  </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {allDecks.map((d) => {
@@ -938,16 +908,6 @@ export default function App() {
                         ))}
                       </select>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleQuickGenerateNewDeck}
-                      title="Tạo ngẫu nhiên một đề 30 câu mới từ ngân hàng câu hỏi"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                    >
-                      <Shuffle className="w-3.5 h-3.5" />
-                      Đổi đề ngẫu nhiên
-                    </button>
 
                     <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
                       <button
@@ -1339,19 +1299,6 @@ export default function App() {
               </>
             )}
           </div>
-        )}
-
-        {/* ==================== SECTION 3: CREATE NEW EXAM (TẠO ĐỀ MỚI) ==================== */}
-        {activeSection === 'create_exam' && (
-          <ExamBuilder
-            allDecks={allDecks}
-            activeDeckId={activeDeck.id}
-            onSelectAndStartDeck={(deck, mode) =>
-              handleResetExam(mode, selectedRound, deck)
-            }
-            onSaveNewDeck={handleSaveNewDeck}
-            onDeleteCustomDeck={handleDeleteCustomDeck}
-          />
         )}
 
         {/* ==================== SECTION 4: STUDY GUIDE (ÔN KIẾN THỨC TIẾNG VIỆT) ==================== */}

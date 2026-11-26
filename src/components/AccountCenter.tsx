@@ -23,6 +23,7 @@ import {
   Trophy,
   Eye,
   X,
+  FilePlus2,
 } from 'lucide-react';
 
 export interface UserAccount {
@@ -430,6 +431,7 @@ export function saveActiveSession(account: UserAccount | null) {
 
 export type AccountTabType =
   | 'teacher_monitor'
+  | 'teacher_create_exam'
   | 'roster'
   | 'profile'
   | 'login'
@@ -439,6 +441,7 @@ interface AccountCenterProps {
   currentUser: UserAccount | null;
   accounts: UserAccount[];
   examHistory: StudentAttemptRecord[];
+  examBuilderNode?: React.ReactNode;
   initialTab?: AccountTabType;
   onLoginSuccess: (account: UserAccount) => void;
   onRegisterSuccess: (account: UserAccount) => void;
@@ -451,6 +454,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   currentUser,
   accounts,
   examHistory,
+  examBuilderNode,
   initialTab = 'roster',
   onLoginSuccess,
   onRegisterSuccess,
@@ -459,7 +463,12 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   onGoToExam,
 }) => {
   const [authTab, setAuthTab] = useState<AccountTabType>(() => {
-    if (initialTab === 'teacher_monitor') return 'teacher_monitor';
+    if (
+      initialTab === 'teacher_monitor' ||
+      initialTab === 'teacher_create_exam'
+    ) {
+      return currentUser?.role === 'teacher' ? initialTab : 'roster';
+    }
     if (currentUser?.role === 'teacher' && initialTab === 'roster') {
       return 'teacher_monitor';
     }
@@ -872,17 +881,30 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
             </p>
           </div>
           {currentUser?.role === 'teacher' ? (
-            <button
-              type="button"
-              onClick={() => {
-                clearFeedback();
-                setAuthTab('teacher_monitor');
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-            >
-              <BarChart3 className="w-4 h-4" />
-              Mở Bảng theo dõi học sinh
-            </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  clearFeedback();
+                  setAuthTab('teacher_monitor');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Theo dõi học sinh
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearFeedback();
+                  setAuthTab('teacher_create_exam');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-teal-50 text-teal-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <FilePlus2 className="w-4 h-4 text-teal-700" />
+                + Tạo đề mới (GV)
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -955,21 +977,40 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => {
-                clearFeedback();
-                setAuthTab('teacher_monitor');
-              }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                authTab === 'teacher_monitor'
-                  ? 'bg-teal-800 text-white shadow-2xs'
-                  : 'text-teal-900 hover:bg-white/60'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              Theo dõi HS (GV)
-            </button>
+            {currentUser?.role === 'teacher' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearFeedback();
+                    setAuthTab('teacher_monitor');
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    authTab === 'teacher_monitor'
+                      ? 'bg-teal-800 text-white shadow-2xs'
+                      : 'text-teal-900 hover:bg-white/60'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Theo dõi HS (GV)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearFeedback();
+                    setAuthTab('teacher_create_exam');
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    authTab === 'teacher_create_exam'
+                      ? 'bg-teal-800 text-white shadow-2xs'
+                      : 'text-teal-900 hover:bg-white/60'
+                  }`}
+                >
+                  <FilePlus2 className="w-4 h-4" />
+                  + Tạo đề mới (GV)
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -1330,6 +1371,30 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ==================== TAB: TEACHER CREATE EXAM (CHỈ DÀNH CHO GIÁO VIÊN) ==================== */}
+        {authTab === 'teacher_create_exam' && currentUser?.role === 'teacher' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-teal-800 uppercase">
+                  Chức năng dành riêng cho Giáo viên ({currentUser.fullName})
+                </div>
+                <p className="text-xs sm:text-sm text-slate-700 mt-0.5">
+                  Tạo bộ đề ngẫu nhiên hoặc tự soạn câu hỏi mới để giao cho học sinh lớp 1A2 luyện thi.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuthTab('teacher_monitor')}
+                className="px-3.5 py-2 rounded-lg bg-white border border-teal-600 text-teal-800 text-xs font-bold hover:bg-teal-100 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                ← Quay lại Bảng theo dõi học sinh
+              </button>
+            </div>
+            {examBuilderNode}
           </div>
         )}
 
