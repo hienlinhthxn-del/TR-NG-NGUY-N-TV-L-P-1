@@ -9,6 +9,8 @@ export type QuestionType =
 export interface McqOption {
   id: string; // 'A' | 'B' | 'C' | 'D'
   text: string;
+  imageUrl?: string;
+  imageAlt?: string;
 }
 
 export interface MatchingItem {

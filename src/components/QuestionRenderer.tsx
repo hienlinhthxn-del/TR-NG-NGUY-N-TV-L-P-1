@@ -132,9 +132,24 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                   >
                     {opt.id}
                   </span>
-                  <span className="text-base sm:text-lg font-medium leading-snug">
-                    {opt.text}
-                  </span>
+                  {opt.imageUrl && !imageErrors[`mcq-${opt.id}`] ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0">
+                      <img
+                        src={opt.imageUrl}
+                        alt={opt.imageAlt || opt.text}
+                        referrerPolicy="no-referrer"
+                        onError={() => handleImageError(`mcq-${opt.id}`)}
+                        className="w-24 h-24 sm:w-28 sm:h-24 object-contain rounded-lg bg-white border border-slate-200 p-1 shrink-0"
+                      />
+                      <span className="text-base sm:text-lg font-medium leading-snug">
+                        {opt.text}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-base sm:text-lg font-medium leading-snug">
+                      {opt.text}
+                    </span>
+                  )}
                 </div>
                 {showFeedback && isOptCorrect && (
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -527,6 +542,24 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
 
     return (
       <div className="space-y-5">
+        {question.imageUrl && (
+          <div className="my-2">
+            {!imageErrors['main'] ? (
+              <img
+                src={question.imageUrl}
+                alt={question.imageAlt || question.prompt}
+                referrerPolicy="no-referrer"
+                onError={() => handleImageError('main')}
+                className="max-h-64 rounded-xl border border-slate-200 object-contain bg-white p-3 shadow-xs"
+              />
+            ) : (
+              <div className="h-44 w-64 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-sm text-slate-600 p-4">
+                {question.imageAlt}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-200">
           <span>
             Hướng dẫn: Nhấn lần lượt vào các thẻ bên dưới để sắp xếp theo đúng thứ tự. Nhấn vào thẻ đã xếp để đưa về kho.
