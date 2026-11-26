@@ -18,6 +18,11 @@ import {
   Calendar,
   Sparkles,
   Play,
+  BarChart3,
+  Clock,
+  Trophy,
+  Eye,
+  X,
 } from 'lucide-react';
 
 export interface UserAccount {
@@ -30,8 +35,25 @@ export interface UserAccount {
   grade: string;
   school: string;
   role: 'student' | 'teacher';
-  studentCode: string; // Số báo danh Trạng Nguyên, ví dụ: SBD-2601
+  studentCode: string; // Số báo danh Trạng Nguyên, ví dụ: SBD-2601 hoặc GV-1A2
   createdAt: string;
+}
+
+export interface StudentAttemptRecord {
+  id: string;
+  accountId?: string;
+  studentCode?: string;
+  roundTitle: string;
+  rankTitle: string;
+  studentName: string;
+  grade: string;
+  score: number;
+  maxScore: number;
+  correctCount: number;
+  totalQuestions: number;
+  timeSpentSeconds: number;
+  completedAt: string;
+  mode: 'exam' | 'practice';
 }
 
 export const ACCOUNTS_STORAGE_KEY = 'tntv_user_accounts_v2';
@@ -60,13 +82,28 @@ export function suggestUsernameFromFullName(fullName: string): string {
   const parts = normalized.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '';
   if (parts.length === 1) return `${parts[0]}tuachua`;
-  // Lấy chữ đệm + tên ghép với tuachua (hoặc họ + tên như mẫu danh sách)
   const lastTwo = parts.slice(-2).join('');
   return `${lastTwo}tuachua`;
 }
 
-// Danh sách 20 học sinh theo đúng bảng danh sách Tủa Chùa gửi kèm
+// Tài khoản Giáo viên chủ nhiệm: hienlinh / 14082008
+export const TEACHER_ACCOUNT: UserAccount = {
+  id: 'gv-hienlinh',
+  username: 'hienlinh',
+  passwordHash: hashCredential('14082008'),
+  defaultPlainPassword: '14082008',
+  fullName: 'Cô giáo Hiền Linh',
+  birthDate: '14/08/2008',
+  grade: 'GVCN Lớp 1A2',
+  school: 'Trường Tiểu học Tủa Chùa',
+  role: 'teacher',
+  studentCode: 'GV-1A2',
+  createdAt: '25/11/2026',
+};
+
+// Danh sách 20 học sinh theo đúng bảng danh sách Tủa Chùa + Tài khoản Giáo viên hienlinh
 export const DEFAULT_ACCOUNTS: UserAccount[] = [
+  TEACHER_ACCOUNT,
   {
     id: 'hs-01',
     username: 'hoaiantuachua',
@@ -335,16 +372,22 @@ export function loadStoredAccounts(): UserAccount[] {
     if (raw) {
       const parsed: UserAccount[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure teacher account hienlinh / 14082008 is always present and updated
+        const withUpdatedTeacher = parsed.map((a) =>
+          a.username.toLowerCase() === 'hienlinh' ? TEACHER_ACCOUNT : a
+        );
         const existingUsernames = new Set(
-          parsed.map((a) => a.username.toLowerCase())
+          withUpdatedTeacher.map((a) => a.username.toLowerCase())
         );
         const missingDefaults = DEFAULT_ACCOUNTS.filter(
           (d) => !existingUsernames.has(d.username.toLowerCase())
         );
-        const merged = [...parsed, ...missingDefaults];
-        if (missingDefaults.length > 0) {
-          localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(merged));
-        }
+        const merged = [
+          ...missingDefaults.filter((d) => d.role === 'teacher'),
+          ...withUpdatedTeacher,
+          ...missingDefaults.filter((d) => d.role !== 'teacher'),
+        ];
+        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(merged));
         return merged;
       }
     }
@@ -369,7 +412,8 @@ export function loadActiveSession(): UserAccount | null {
   } catch {
     // ignore
   }
-  return DEFAULT_ACCOUNTS[0];
+  // Mặc định mở sẵn tài khoản học sinh đầu tiên hoặc giáo viên có thể bấm đăng nhập
+  return DEFAULT_ACCOUNTS[1] || DEFAULT_ACCOUNTS[0];
 }
 
 export function saveActiveSession(account: UserAccount | null) {
@@ -384,10 +428,18 @@ export function saveActiveSession(account: UserAccount | null) {
   }
 }
 
+export type AccountTabType =
+  | 'teacher_monitor'
+  | 'roster'
+  | 'profile'
+  | 'login'
+  | 'register';
+
 interface AccountCenterProps {
   currentUser: UserAccount | null;
   accounts: UserAccount[];
-  initialTab?: 'roster' | 'profile' | 'login' | 'register';
+  examHistory: StudentAttemptRecord[];
+  initialTab?: AccountTabType;
   onLoginSuccess: (account: UserAccount) => void;
   onRegisterSuccess: (account: UserAccount) => void;
   onUpdateProfile: (updated: UserAccount) => void;
@@ -398,6 +450,7 @@ interface AccountCenterProps {
 export const AccountCenter: React.FC<AccountCenterProps> = ({
   currentUser,
   accounts,
+  examHistory,
   initialTab = 'roster',
   onLoginSuccess,
   onRegisterSuccess,
@@ -405,13 +458,26 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   onLogout,
   onGoToExam,
 }) => {
-  const [authTab, setAuthTab] = useState<
-    'roster' | 'profile' | 'login' | 'register'
-  >(initialTab);
+  const [authTab, setAuthTab] = useState<AccountTabType>(() => {
+    if (initialTab === 'teacher_monitor') return 'teacher_monitor';
+    if (currentUser?.role === 'teacher' && initialTab === 'roster') {
+      return 'teacher_monitor';
+    }
+    return initialTab;
+  });
 
   // Roster Search State
   const [rosterSearch, setRosterSearch] = useState<string>('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Teacher Monitor Filter & Selected Student Modal State
+  const [monitorSearch, setMonitorSearch] = useState<string>('');
+  const [monitorFilter, setMonitorFilter] = useState<
+    'all' | 'practiced' | 'not_practiced' | 'passed' | 'needs_help'
+  >('all');
+  const [inspectedStudentId, setInspectedStudentId] = useState<string | null>(
+    null
+  );
 
   // Login Form State
   const [loginUsername, setLoginUsername] = useState<string>('');
@@ -458,6 +524,11 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     setNotFoundUserQuery(null);
   };
 
+  const studentAccounts = useMemo(
+    () => accounts.filter((a) => a.role === 'student'),
+    [accounts]
+  );
+
   const filteredRoster = useMemo(() => {
     const q = rosterSearch.trim().toLowerCase();
     if (!q) return accounts;
@@ -470,18 +541,125 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     );
   }, [accounts, rosterSearch]);
 
+  // Compute per-student practice analytics for Teacher Dashboard
+  const studentProgressRows = useMemo(() => {
+    return studentAccounts.map((stu) => {
+      const stuAttempts = examHistory.filter(
+        (h) =>
+          h.accountId === stu.id ||
+          h.studentCode === stu.studentCode ||
+          h.studentName.trim().toLowerCase() ===
+            stu.fullName.trim().toLowerCase()
+      );
+      const attemptCount = stuAttempts.length;
+      const highestScore =
+        attemptCount > 0 ? Math.max(...stuAttempts.map((a) => a.score)) : 0;
+      const avgScore =
+        attemptCount > 0
+          ? Math.round(
+              stuAttempts.reduce((sum, a) => sum + a.score, 0) / attemptCount
+            )
+          : 0;
+      const bestAttempt =
+        attemptCount > 0
+          ? stuAttempts.reduce((best, cur) =>
+              cur.score > best.score ? cur : best
+            )
+          : null;
+      const latestAttempt = attemptCount > 0 ? stuAttempts[0] : null;
+
+      return {
+        student: stu,
+        attempts: stuAttempts,
+        attemptCount,
+        highestScore,
+        avgScore,
+        bestRank: bestAttempt?.rankTitle || '—',
+        latestCompletedAt: latestAttempt?.completedAt || 'Chưa làm bài',
+        latestScore: latestAttempt ? latestAttempt.score : null,
+      };
+    });
+  }, [studentAccounts, examHistory]);
+
+  const teacherStats = useMemo(() => {
+    const totalStudents = studentProgressRows.length;
+    const practicedStudents = studentProgressRows.filter(
+      (r) => r.attemptCount > 0
+    ).length;
+    const notPracticedStudents = totalStudents - practicedStudents;
+    const totalAttempts = studentProgressRows.reduce(
+      (sum, r) => sum + r.attemptCount,
+      0
+    );
+    const allScores = studentProgressRows
+      .filter((r) => r.attemptCount > 0)
+      .map((r) => r.highestScore);
+    const classAvgBestScore =
+      allScores.length > 0
+        ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+        : 0;
+    const classMaxScore = allScores.length > 0 ? Math.max(...allScores) : 0;
+
+    return {
+      totalStudents,
+      practicedStudents,
+      notPracticedStudents,
+      totalAttempts,
+      classAvgBestScore,
+      classMaxScore,
+    };
+  }, [studentProgressRows]);
+
+  const filteredMonitorRows = useMemo(() => {
+    const q = monitorSearch.trim().toLowerCase();
+    return studentProgressRows.filter((row) => {
+      if (monitorFilter === 'practiced' && row.attemptCount === 0) return false;
+      if (monitorFilter === 'not_practiced' && row.attemptCount > 0)
+        return false;
+      if (
+        monitorFilter === 'passed' &&
+        (row.attemptCount === 0 || row.highestScore < 200)
+      )
+        return false;
+      if (
+        monitorFilter === 'needs_help' &&
+        (row.attemptCount === 0 || row.highestScore >= 200)
+      )
+        return false;
+
+      if (!q) return true;
+      return (
+        row.student.fullName.toLowerCase().includes(q) ||
+        row.student.username.toLowerCase().includes(q) ||
+        row.student.studentCode.toLowerCase().includes(q)
+      );
+    });
+  }, [studentProgressRows, monitorSearch, monitorFilter]);
+
+  const inspectedStudentRow = useMemo(() => {
+    if (!inspectedStudentId) return null;
+    return (
+      studentProgressRows.find((r) => r.student.id === inspectedStudentId) ||
+      null
+    );
+  }, [studentProgressRows, inspectedStudentId]);
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   // Open Register Tab and pre-fill name or username from search/login query
   const handleStartRegisterFromQuery = (rawQuery: string) => {
     clearFeedback();
     const cleaned = rawQuery.trim();
     if (cleaned.includes(' ')) {
-      // Likely a full name like "Lò Văn Nam"
       setRegFullName(cleaned);
       const suggested = suggestUsernameFromFullName(cleaned);
       setRegUsername(suggested);
       setUsernameManuallyEdited(false);
     } else if (cleaned) {
-      // Likely a username like "vannamtuachua"
       setRegUsername(cleaned.toLowerCase().replace(/[^a-z0-9_]/g, ''));
       setUsernameManuallyEdited(true);
     }
@@ -496,12 +674,9 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
         setRegUsername('');
         return;
       }
-      // Avoid collision with existing accounts
       let candidate = baseSuggestion;
       let suffix = 1;
-      while (
-        accounts.some((a) => a.username.toLowerCase() === candidate)
-      ) {
+      while (accounts.some((a) => a.username.toLowerCase() === candidate)) {
         candidate = `${baseSuggestion}${suffix}`;
         suffix += 1;
       }
@@ -535,7 +710,9 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
       found.passwordHash === hashCredential(loginPassword.trim());
     if (!exactMatch && !trimmedMatch) {
       setErrorMsg(
-        'Mật khẩu chưa chính xác (Mật khẩu chuẩn của lớp là: Tuachua2026).'
+        found.role === 'teacher'
+          ? 'Mật khẩu giáo viên chưa chính xác.'
+          : 'Mật khẩu chưa chính xác (Mật khẩu chuẩn của học sinh lớp 1A2 là: Tuachua2026).'
       );
       return;
     }
@@ -545,8 +722,16 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     setEditBirthDate(found.birthDate || '');
     setEditGrade(found.grade);
     setEditSchool(found.school);
-    setAuthTab('profile');
-    setSuccessMsg(`Đăng nhập thành công! Xin chào em ${found.fullName}.`);
+
+    if (found.role === 'teacher') {
+      setAuthTab('teacher_monitor');
+      setSuccessMsg(
+        `Đăng nhập tài khoản Giáo viên (${found.username}) thành công! Chào mừng cô theo dõi tình hình luyện thi của lớp.`
+      );
+    } else {
+      setAuthTab('profile');
+      setSuccessMsg(`Đăng nhập thành công! Xin chào em ${found.fullName}.`);
+    }
   };
 
   const handleRegisterSubmit = (
@@ -585,7 +770,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
       return;
     }
 
-    const nextNum = accounts.length + 1;
+    const nextNum = studentAccounts.length + 1;
     const newAccount: UserAccount = {
       id: `acc-${Date.now()}`,
       username: cleanUser,
@@ -615,9 +800,9 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     if (startExamImmediately) {
       onGoToExam();
     } else {
-      setAuthTab('profile');
+      setAuthTab(newAccount.role === 'teacher' ? 'teacher_monitor' : 'profile');
       setSuccessMsg(
-        `Đã tạo tài khoản thành công cho ${newAccount.fullName} (Tên đăng nhập: ${newAccount.username} · Số báo danh: ${newAccount.studentCode})!`
+        `Đã tạo tài khoản thành công cho ${newAccount.fullName} (Tên đăng nhập: ${newAccount.username} · Mã: ${newAccount.studentCode})!`
       );
     }
   };
@@ -650,6 +835,11 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
     setEditSchool(acc.school);
     if (startExamNow) {
       onGoToExam();
+    } else if (acc.role === 'teacher') {
+      setAuthTab('teacher_monitor');
+      setSuccessMsg(
+        `Đã đăng nhập tài khoản Giáo viên: ${acc.fullName} (${acc.username}).`
+      );
     } else {
       setSuccessMsg(
         `Đã đăng nhập tài khoản học sinh: ${acc.fullName} (${acc.username}).`
@@ -667,28 +857,71 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Callout Banner for Students Without an Account */}
-      <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-0.5">
-          <div className="text-xs font-bold text-amber-800 uppercase">
-            Dành cho học sinh chưa có tên trong danh sách lớp
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Top Quick Banner: Teacher Monitor Callout & Student Register Callout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Teacher Account Quick Access Banner */}
+        <div className="lg:col-span-6 bg-teal-900 text-white rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 uppercase">
+              <BarChart3 className="w-4 h-4" />
+              <span>Dành cho Giáo viên Chủ nhiệm (TK: hienlinh)</span>
+            </div>
+            <p className="text-xs sm:text-sm text-teal-100 leading-relaxed">
+              Theo dõi sĩ số học sinh đã làm bài, điểm cao nhất, điểm trung bình và chi tiết từng lần thi của học sinh lớp 1A2.
+            </p>
           </div>
-          <p className="text-sm text-slate-700">
-            Nếu em chưa có tài khoản hoặc không tìm thấy tên mình trong danh sách 20 bạn bên dưới, hãy nhấn nút <strong>"Tạo tài khoản mới"</strong> để đăng ký và nhận Số báo danh ngay!
-          </p>
+          {currentUser?.role === 'teacher' ? (
+            <button
+              type="button"
+              onClick={() => {
+                clearFeedback();
+                setAuthTab('teacher_monitor');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Mở Bảng theo dõi học sinh
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                clearFeedback();
+                setLoginUsername('hienlinh');
+                setLoginPassword('');
+                setAuthTab('login');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-teal-50 text-teal-950 text-xs sm:text-sm font-extrabold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <LogIn className="w-4 h-4 text-teal-700" />
+              Đăng nhập Giáo viên (hienlinh)
+            </button>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            clearFeedback();
-            setAuthTab('register');
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
-        >
-          <UserPlus className="w-4 h-4" />
-          Chưa có tài khoản? Tạo tài khoản ngay
-        </button>
+
+        {/* Student Without Account Callout Banner */}
+        <div className="lg:col-span-6 bg-amber-50/90 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs font-bold text-amber-800 uppercase">
+              Học sinh chưa có tên trong danh sách lớp?
+            </div>
+            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+              Nếu em chưa có tài khoản trong danh sách 20 bạn bên dưới, nhấn nút bên cạnh để tạo tài khoản mới và nhận Số báo danh ngay!
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              clearFeedback();
+              setAuthTab('register');
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            + Tạo tài khoản mới
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
@@ -697,15 +930,23 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-teal-700 mb-1">
               <ShieldCheck className="w-4 h-4" />
-              <span>DANH SÁCH TÀI KHOẢN HỌC SINH LỚP 1A2 · TỦA CHÙA</span>
+              <span>
+                {currentUser?.role === 'teacher'
+                  ? 'BẢNG QUẢN LÝ & THEO DÕI HỌC SINH · GIÁO VIÊN HIỀN LINH'
+                  : 'HỆ THỐNG TÀI KHOẢN GIÁO VIÊN & HỌC SINH LỚP 1A2 · TỦA CHÙA'}
+              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-slate-900">
               {currentUser
-                ? `Đang đăng nhập: ${currentUser.fullName}`
-                : 'Quản lý Tài khoản & Đăng ký Mới'}
+                ? `Đang đăng nhập: ${currentUser.fullName} (${currentUser.username})`
+                : 'Quản lý Tài khoản & Theo dõi Luyện thi'}
             </h1>
             <p className="text-sm text-slate-600 mt-1">
-              Hiện có <strong>{accounts.length} tài khoản học sinh</strong> trong hệ thống (mật khẩu mặc định:{' '}
+              Tài khoản Giáo viên:{' '}
+              <code className="font-mono font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                hienlinh
+              </code>{' '}
+              · Đã cấp <strong>{studentAccounts.length} tài khoản học sinh</strong> (mật khẩu HS:{' '}
               <code className="font-mono font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
                 Tuachua2026
               </code>
@@ -714,6 +955,21 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => {
+                clearFeedback();
+                setAuthTab('teacher_monitor');
+              }}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                authTab === 'teacher_monitor'
+                  ? 'bg-teal-800 text-white shadow-2xs'
+                  : 'text-teal-900 hover:bg-white/60'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Theo dõi HS (GV)
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -727,7 +983,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               }`}
             >
               <Users className="w-4 h-4" />
-              Danh sách lớp ({accounts.length} HS)
+              Danh sách TK ({accounts.length})
             </button>
             <button
               type="button"
@@ -742,7 +998,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               }`}
             >
               <UserPlus className="w-4 h-4" />
-              + Tạo tài khoản mới
+              + Tạo tài khoản
             </button>
             <button
               type="button"
@@ -773,7 +1029,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 }`}
               >
                 <User className="w-4 h-4" />
-                Thẻ thí sinh
+                Hồ sơ
               </button>
             )}
           </div>
@@ -804,17 +1060,280 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
               <span>{successMsg}</span>
             </div>
-            <button
-              type="button"
-              onClick={onGoToExam}
-              className="px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer whitespace-nowrap shrink-0"
-            >
-              Bắt đầu làm bài thi ngay →
-            </button>
+            <div className="flex items-center gap-2">
+              {currentUser?.role === 'teacher' &&
+                authTab !== 'teacher_monitor' && (
+                  <button
+                    type="button"
+                    onClick={() => setAuthTab('teacher_monitor')}
+                    className="px-3.5 py-1.5 rounded-lg bg-teal-800 text-white text-xs font-bold hover:bg-teal-900 cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    Xem bảng theo dõi học sinh
+                  </button>
+                )}
+              <button
+                type="button"
+                onClick={onGoToExam}
+                className="px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                Vào phòng thi →
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ==================== TAB 0: CLASS ROSTER (20+ STUDENTS) ==================== */}
+        {/* ==================== TAB: TEACHER MONITORING DASHBOARD (THEO DÕI HỌC SINH) ==================== */}
+        {authTab === 'teacher_monitor' && (
+          <div className="space-y-6">
+            {/* Prompt if not logged in as teacher yet */}
+            {currentUser?.role !== 'teacher' && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-amber-900">
+                    Đang xem ở chế độ khách / học sinh
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700">
+                    Để quản lý lớp với quyền Giáo viên chủ nhiệm, cô có thể đăng nhập tài khoản{' '}
+                    <code className="font-mono font-bold text-teal-900">
+                      hienlinh
+                    </code>{' '}
+                    (Mật khẩu:{' '}
+                    <code className="font-mono font-bold text-teal-900">
+                      14082008
+                    </code>
+                    ).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSwitchAccount(TEACHER_ACCOUNT, false)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Chuyển nhanh sang TK Giáo viên (hienlinh)
+                </button>
+              </div>
+            )}
+
+            {/* 4 Summary Metric Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-xs font-semibold text-slate-500">
+                  Tổng sĩ số lớp 1A2
+                </div>
+                <div className="text-2xl font-display font-extrabold text-slate-900 tabular-nums mt-1">
+                  {teacherStats.totalStudents} học sinh
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Trường Tiểu học Tủa Chùa
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                <div className="text-xs font-semibold text-emerald-800">
+                  Đã tham gia luyện thi
+                </div>
+                <div className="text-2xl font-display font-extrabold text-emerald-800 tabular-nums mt-1">
+                  {teacherStats.practicedStudents} / {teacherStats.totalStudents}{' '}
+                  HS
+                </div>
+                <div className="text-xs text-emerald-700 mt-1 tabular-nums">
+                  Còn {teacherStats.notPracticedStudents} HS chưa làm bài
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200">
+                <div className="text-xs font-semibold text-teal-800">
+                  Tổng số lượt nộp bài
+                </div>
+                <div className="text-2xl font-display font-extrabold text-teal-900 tabular-nums mt-1">
+                  {teacherStats.totalAttempts} lượt thi
+                </div>
+                <div className="text-xs text-teal-700 mt-1">
+                  Lưu tự động khi học sinh nộp bài
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+                <div className="text-xs font-semibold text-amber-900">
+                  Điểm TB / Điểm cao nhất
+                </div>
+                <div className="text-2xl font-display font-extrabold text-amber-900 tabular-nums mt-1">
+                  {teacherStats.classAvgBestScore}đ /{' '}
+                  {teacherStats.classMaxScore}đ
+                </div>
+                <div className="text-xs text-amber-800 mt-1">
+                  Thang điểm chuẩn 300 điểm
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="relative flex-1 min-w-[230px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  value={monitorSearch}
+                  onChange={(e) => setMonitorSearch(e.target.value)}
+                  placeholder="Tìm học sinh theo họ tên, SBD hoặc tên đăng nhập..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-teal-600"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  {
+                    id: 'all',
+                    label: `Tất cả (${teacherStats.totalStudents})`,
+                  },
+                  {
+                    id: 'practiced',
+                    label: `Đã luyện thi (${teacherStats.practicedStudents})`,
+                  },
+                  {
+                    id: 'not_practiced',
+                    label: `Chưa làm bài (${teacherStats.notPracticedStudents})`,
+                  },
+                  {
+                    id: 'passed',
+                    label: 'Đạt >= 200đ',
+                  },
+                  {
+                    id: 'needs_help',
+                    label: 'Cần rèn thêm (< 200đ)',
+                  },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setMonitorFilter(f.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
+                      monitorFilter === f.id
+                        ? 'bg-teal-800 text-white'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:border-teal-600'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Detailed Student Monitoring Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
+                    <th className="py-3 px-4">STT</th>
+                    <th className="py-3 px-4">Học sinh & Tên đăng nhập</th>
+                    <th className="py-3 px-4">Trạng thái</th>
+                    <th className="py-3 px-4">Số lượt thi</th>
+                    <th className="py-3 px-4">Điểm cao nhất</th>
+                    <th className="py-3 px-4">Điểm TB</th>
+                    <th className="py-3 px-4">Danh hiệu đạt được</th>
+                    <th className="py-3 px-4">Lần nộp gần nhất</th>
+                    <th className="py-3 px-4 text-right">Theo dõi / Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {filteredMonitorRows.map((row, idx) => {
+                    const hasPracticed = row.attemptCount > 0;
+                    return (
+                      <tr
+                        key={row.student.id}
+                        className="hover:bg-slate-50/80 transition-colors"
+                      >
+                        <td className="py-3.5 px-4 font-bold text-slate-500 tabular-nums">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900">
+                            {row.student.fullName}
+                          </div>
+                          <div className="text-xs text-slate-500 font-mono tabular-nums">
+                            {row.student.username} · {row.student.studentCode}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {hasPracticed ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-100 text-emerald-900">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                              Đã luyện thi
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-600">
+                              Chưa làm bài
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-800 tabular-nums">
+                          {row.attemptCount} lượt
+                        </td>
+                        <td className="py-3.5 px-4 tabular-nums">
+                          {hasPracticed ? (
+                            <span
+                              className={`font-display font-extrabold ${
+                                row.highestScore >= 200
+                                  ? 'text-teal-800'
+                                  : 'text-rose-600'
+                              }`}
+                            >
+                              {row.highestScore} / 300
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700 tabular-nums">
+                          {hasPracticed ? `${row.avgScore} đ` : '—'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {hasPracticed ? (
+                            <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
+                              {row.bestRank}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500 tabular-nums">
+                          {row.latestCompletedAt}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setInspectedStudentId(row.student.id)
+                              }
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:border-teal-600 text-slate-700 text-xs font-bold cursor-pointer whitespace-nowrap"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-teal-700" />
+                              Chi tiết ({row.attemptCount})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleQuickSwitchAccount(row.student, true)
+                              }
+                              title="Chuyển sang tài khoản học sinh này để làm bài thi"
+                              className="px-3 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer whitespace-nowrap"
+                            >
+                              Thi hộ / Kiểm tra
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 0: CLASS ROSTER (20+ STUDENTS & TEACHER) ==================== */}
         {authTab === 'roster' && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -824,7 +1343,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                   type="text"
                   value={rosterSearch}
                   onChange={(e) => setRosterSearch(e.target.value)}
-                  placeholder="Tìm kiếm tên học sinh, tên đăng nhập hoặc ngày sinh..."
+                  placeholder="Tìm kiếm tên học sinh, giáo viên, tên đăng nhập hoặc ngày sinh..."
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-teal-600"
                 />
               </div>
@@ -861,7 +1380,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
                       <th className="py-3 px-4">STT</th>
-                      <th className="py-3 px-4">Họ và tên học sinh</th>
+                      <th className="py-3 px-4">Họ và tên</th>
                       <th className="py-3 px-4">Ngày sinh</th>
                       <th className="py-3 px-4">Tên đăng nhập</th>
                       <th className="py-3 px-4">Mật khẩu</th>
@@ -871,12 +1390,15 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredRoster.map((acc, index) => {
                       const isCurrent = currentUser?.id === acc.id;
+                      const isTeacher = acc.role === 'teacher';
                       return (
                         <tr
                           key={acc.id}
                           className={`transition-colors ${
                             isCurrent
                               ? 'bg-teal-50/70'
+                              : isTeacher
+                              ? 'bg-amber-50/40 hover:bg-amber-50/70'
                               : 'hover:bg-slate-50/80'
                           }`}
                         >
@@ -886,6 +1408,11 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                           <td className="py-3 px-4">
                             <div className="font-bold text-slate-900 flex items-center gap-2">
                               <span>{acc.fullName}</span>
+                              {isTeacher && (
+                                <span className="text-[11px] font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md">
+                                  Giáo viên
+                                </span>
+                              )}
                               {isCurrent && (
                                 <span className="text-[11px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-md">
                                   Đang chọn
@@ -934,17 +1461,33 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                                     : 'border-slate-300 text-slate-700 hover:border-teal-600 bg-white'
                                 }`}
                               >
-                                {isCurrent ? 'Đã đăng nhập' : 'Chọn HS'}
+                                {isCurrent
+                                  ? 'Đã đăng nhập'
+                                  : isTeacher
+                                  ? 'Chọn GV'
+                                  : 'Chọn HS'}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleQuickSwitchAccount(acc, true)
-                                }
-                                className="px-3.5 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer whitespace-nowrap"
-                              >
-                                Vào thi ngay
-                              </button>
+                              {isTeacher ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleQuickSwitchAccount(acc, false)
+                                  }
+                                  className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer whitespace-nowrap"
+                                >
+                                  Theo dõi lớp
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleQuickSwitchAccount(acc, true)
+                                  }
+                                  className="px-3.5 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer whitespace-nowrap"
+                                >
+                                  Vào thi ngay
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -960,7 +1503,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
         {/* ==================== TAB 1: CURRENT USER PROFILE & LOGOUT ==================== */}
         {authTab === 'profile' && currentUser && (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-            {/* Student ID Card */}
+            {/* Student/Teacher ID Card */}
             <div className="md:col-span-5 p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-5">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-teal-700 text-white font-display font-extrabold text-xl flex items-center justify-center shrink-0">
@@ -969,7 +1512,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 <div>
                   <div className="text-xs font-bold text-teal-700">
                     {currentUser.role === 'teacher'
-                      ? 'TÀI KHOẢN GIÁO VIÊN'
+                      ? 'TÀI KHOẢN GIÁO VIÊN CHỦ NHIỆM'
                       : 'THẺ THÍ SINH TRẠNG NGUYÊN'}
                   </div>
                   <h2 className="text-lg font-display font-extrabold text-slate-900">
@@ -983,7 +1526,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
 
               <div className="space-y-2.5 pt-3 border-t border-slate-200/80 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Số báo danh:</span>
+                  <span className="text-slate-500">Mã định danh:</span>
                   <strong className="font-mono text-teal-800 tabular-nums">
                     {currentUser.studentCode}
                   </strong>
@@ -1013,6 +1556,15 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               </div>
 
               <div className="pt-2 flex flex-col gap-2.5">
+                {currentUser.role === 'teacher' && (
+                  <button
+                    type="button"
+                    onClick={() => setAuthTab('teacher_monitor')}
+                    className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors cursor-pointer"
+                  >
+                    Mở Bảng theo dõi luyện thi của học sinh
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onGoToExam}
@@ -1041,7 +1593,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               className="md:col-span-7 p-6 rounded-2xl border border-slate-200 bg-white space-y-4"
             >
               <h3 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100">
-                Cập nhật thông tin học sinh
+                Cập nhật thông tin tài khoản
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1127,7 +1679,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
             >
               <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                 <h2 className="text-lg font-display font-bold text-slate-900">
-                  Đăng nhập bằng Tên đăng nhập & Mật khẩu
+                  Đăng nhập Giáo viên hoặc Học sinh
                 </h2>
                 <button
                   type="button"
@@ -1151,7 +1703,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                     type="text"
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
-                    placeholder="Ví dụ: hoaiantuachua, tongkhoi1a2..."
+                    placeholder="GV: hienlinh | HS: hoaiantuachua, tongkhoi1a2..."
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
                   />
                 </div>
@@ -1167,20 +1719,32 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Mật khẩu mặc định: Tuachua2026"
+                    placeholder="Nhập mật khẩu đăng nhập..."
                     className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setLoginPassword('Tuachua2026')}
-                  className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
-                >
-                  Điền nhanh mật khẩu: Tuachua2026
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginUsername('hienlinh');
+                      setLoginPassword('14082008');
+                    }}
+                    className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg hover:bg-amber-100 cursor-pointer"
+                  >
+                    Điền TK Giáo viên (hienlinh)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginPassword('Tuachua2026')}
+                    className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+                  >
+                    Điền MK Học sinh: Tuachua2026
+                  </button>
+                </div>
                 <button
                   type="submit"
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold transition-colors cursor-pointer"
@@ -1206,23 +1770,20 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
               </div>
             </form>
 
-            {/* Quick Switch 20 Students */}
+            {/* Quick Switch Teacher & 20 Students */}
             <div className="md:col-span-5 p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                 <KeyRound className="w-4 h-4 text-teal-700" />
-                <span>CHỌN NHANH HỌC SINH TRONG DANH SÁCH</span>
+                <span>CHỌN NHANH GIÁO VIÊN / HỌC SINH</span>
               </div>
               <p className="text-xs text-slate-500">
-                Nhấn vào tên học sinh dưới đây để đăng nhập ngay (Mật khẩu:{' '}
-                <code className="font-mono bg-white px-1 py-0.5 rounded border">
-                  Tuachua2026
-                </code>
-                ):
+                Nhấn vào tài khoản dưới đây để đăng nhập nhanh:
               </p>
 
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                 {accounts.map((acc, idx) => {
                   const isCurrent = currentUser?.id === acc.id;
+                  const isTeacher = acc.role === 'teacher';
                   return (
                     <button
                       key={acc.id}
@@ -1231,15 +1792,24 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                       className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
                         isCurrent
                           ? 'bg-teal-50 border-teal-600'
+                          : isTeacher
+                          ? 'bg-amber-50/80 border-amber-300 hover:border-amber-500'
                           : 'bg-white border-slate-200 hover:border-teal-500'
                       }`}
                     >
                       <div className="min-w-0">
-                        <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                          {idx + 1}. {acc.fullName}
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 truncate flex items-center gap-1.5">
+                          <span>
+                            {idx + 1}. {acc.fullName}
+                          </span>
+                          {isTeacher && (
+                            <span className="text-[10px] font-extrabold bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded">
+                              GV
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-slate-500 truncate font-mono">
-                          {acc.username} · {acc.birthDate}
+                          TK: {acc.username} · MK: {acc.defaultPlainPassword}
                         </div>
                       </div>
                       <span className="text-xs font-bold text-teal-700 shrink-0">
@@ -1269,7 +1839,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 </p>
               </div>
               <span className="text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg tabular-nums">
-                SBD dự kiến: SBD-{2600 + accounts.length + 1}
+                SBD dự kiến: SBD-{2600 + studentAccounts.length + 1}
               </span>
             </div>
 
@@ -1385,17 +1955,18 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  6. Trường Tiểu học
+                  6. Vai trò tài khoản
                 </label>
-                <div className="relative">
-                  <School className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={regSchool}
-                    onChange={(e) => setRegSchool(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:border-teal-600"
-                  />
-                </div>
+                <select
+                  value={regRole}
+                  onChange={(e) =>
+                    setRegRole(e.target.value as 'student' | 'teacher')
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white focus:outline-none focus:border-teal-600"
+                >
+                  <option value="student">Học sinh dự thi</option>
+                  <option value="teacher">Giáo viên hướng dẫn</option>
+                </select>
               </div>
             </div>
 
@@ -1408,7 +1979,7 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
                 }}
                 className="text-xs font-bold text-slate-600 hover:text-teal-700 hover:underline cursor-pointer"
               >
-                ← Quay lại Danh sách lớp ({accounts.length} HS)
+                ← Quay lại Danh sách lớp ({accounts.length} TK)
               </button>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -1432,6 +2003,134 @@ export const AccountCenter: React.FC<AccountCenterProps> = ({
           </form>
         )}
       </div>
+
+      {/* Modal: Chi tiết lịch sử làm bài của 1 học sinh dành cho Giáo viên */}
+      {inspectedStudentRow && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-xl space-y-5 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="text-xs font-bold text-teal-700 uppercase">
+                  Hồ sơ luyện thi chi tiết · {inspectedStudentRow.student.grade}
+                </div>
+                <h3 className="text-xl font-display font-extrabold text-slate-900 mt-0.5">
+                  {inspectedStudentRow.student.fullName} (
+                  {inspectedStudentRow.student.studentCode})
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  Tên đăng nhập: {inspectedStudentRow.student.username} · Ngày
+                  sinh: {inspectedStudentRow.student.birthDate || '—'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectedStudentId(null)}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-xs text-slate-500">Số lần làm bài</div>
+                <div className="text-lg font-extrabold text-slate-900 tabular-nums mt-0.5">
+                  {inspectedStudentRow.attemptCount} lượt
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-teal-50 border border-teal-200">
+                <div className="text-xs text-teal-800">Điểm cao nhất</div>
+                <div className="text-lg font-extrabold text-teal-900 tabular-nums mt-0.5">
+                  {inspectedStudentRow.highestScore} / 300
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <div className="text-xs text-amber-900">Danh hiệu</div>
+                <div className="text-base font-extrabold text-amber-900 mt-0.5">
+                  {inspectedStudentRow.bestRank}
+                </div>
+              </div>
+            </div>
+
+            {inspectedStudentRow.attempts.length === 0 ? (
+              <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
+                <p className="text-sm font-bold text-slate-800">
+                  Học sinh này chưa có lượt nộp bài nào.
+                </p>
+                <p className="text-xs text-slate-500">
+                  Cô có thể nhấn nút bên dưới để chuyển sang tài khoản của em{' '}
+                  <strong>{inspectedStudentRow.student.fullName}</strong> và bắt đầu bài thi.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-700 uppercase">
+                  Lịch sử các lần nộp bài ({inspectedStudentRow.attempts.length}{' '}
+                  lượt):
+                </h4>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                  {inspectedStudentRow.attempts.map((att, i) => (
+                    <div
+                      key={att.id}
+                      className="p-3.5 bg-white hover:bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="font-bold text-slate-900">
+                          Lần #{inspectedStudentRow.attempts.length - i}:{' '}
+                          {att.roundTitle}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-3 tabular-nums">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            Thời gian: {formatDuration(att.timeSpentSeconds)}
+                          </span>
+                          <span>·</span>
+                          <span>Nộp lúc: {att.completedAt}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
+                          <Trophy className="w-3.5 h-3.5 inline mr-1" />
+                          {att.rankTitle}
+                        </span>
+                        <div className="text-right tabular-nums">
+                          <div className="font-display font-extrabold text-teal-800">
+                            {att.score} / {att.maxScore} đ
+                          </div>
+                          <div className="text-xs text-emerald-700 font-semibold">
+                            Đúng {att.correctCount}/{att.totalQuestions} câu
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const stu = inspectedStudentRow.student;
+                  setInspectedStudentId(null);
+                  handleQuickSwitchAccount(stu, true);
+                }}
+                className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer"
+              >
+                Vào làm bài với tài khoản {inspectedStudentRow.student.fullName}
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectedStudentId(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+              >
+                Đóng cửa sổ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

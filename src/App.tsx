@@ -44,6 +44,7 @@ import { ExamRoundCodeBlueprint } from './components/ExamRoundCodeBlueprint';
 import { ExamBuilder } from './components/ExamBuilder';
 import {
   UserAccount,
+  AccountTabType,
   AccountCenter,
   ACCOUNTS_STORAGE_KEY,
   loadStoredAccounts,
@@ -86,7 +87,7 @@ interface ExamAttempt {
   mode: 'exam' | 'practice';
 }
 
-const STORAGE_HISTORY_KEY = 'tntv_exam_history_v1';
+const STORAGE_HISTORY_KEY = 'tntv_exam_history_v2';
 const STORAGE_CUSTOM_DECKS_KEY = 'tntv_custom_decks_v1';
 
 export default function App() {
@@ -118,13 +119,10 @@ export default function App() {
   const [showResultDashboard, setShowResultDashboard] = useState<boolean>(true);
   const [filterMyHistoryOnly, setFilterMyHistoryOnly] =
     useState<boolean>(false);
-  const [accountInitialTab, setAccountInitialTab] = useState<
-    'roster' | 'profile' | 'login' | 'register'
-  >('roster');
+  const [accountInitialTab, setAccountInitialTab] =
+    useState<AccountTabType>('teacher_monitor');
 
-  const openAccountSection = (
-    tab: 'roster' | 'profile' | 'login' | 'register' = 'roster'
-  ) => {
+  const openAccountSection = (tab: AccountTabType = 'roster') => {
     setAccountInitialTab(tab);
     setActiveSection('account');
   };
@@ -204,19 +202,83 @@ export default function App() {
     }
     return [
       {
-        id: 'sample-1',
-        accountId: 'acc-student-1',
-        studentCode: 'SBD-10248',
+        id: 'sample-hs-01',
+        accountId: 'hs-01',
+        studentCode: 'SBD-2601',
+        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
+        rankTitle: 'Trạng Nguyên',
+        studentName: 'Tòng Hoài An',
+        grade: 'Lớp 1A2',
+        score: 290,
+        maxScore: 300,
+        correctCount: 29,
+        totalQuestions: 30,
+        timeSpentSeconds: 780,
+        completedAt: '25/11/2026, 19:45',
+        mode: 'exam',
+      },
+      {
+        id: 'sample-hs-02',
+        accountId: 'hs-02',
+        studentCode: 'SBD-2602',
         roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
         rankTitle: 'Bảng Nhãn',
-        studentName: 'Nguyễn Minh An',
-        grade: 'Lớp 1A',
-        score: 280,
+        studentName: 'Lò Huyền Anh',
+        grade: 'Lớp 1A2',
+        score: 270,
         maxScore: 300,
-        correctCount: 28,
+        correctCount: 27,
         totalQuestions: 30,
-        timeSpentSeconds: 945,
-        completedAt: 'Hôm qua, 19:30',
+        timeSpentSeconds: 850,
+        completedAt: '25/11/2026, 19:20',
+        mode: 'practice',
+      },
+      {
+        id: 'sample-hs-03',
+        accountId: 'hs-03',
+        studentCode: 'SBD-2603',
+        roundTitle: 'Đề số 2: Đề Luyện Thi Hương - Cấp Trường Mở Rộng',
+        rankTitle: 'Bảng Nhãn',
+        studentName: 'Nguyễn Hoàng Tú Anh',
+        grade: 'Lớp 1A2',
+        score: 260,
+        maxScore: 300,
+        correctCount: 26,
+        totalQuestions: 30,
+        timeSpentSeconds: 910,
+        completedAt: '25/11/2026, 18:55',
+        mode: 'exam',
+      },
+      {
+        id: 'sample-hs-05',
+        accountId: 'hs-05',
+        studentCode: 'SBD-2605',
+        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
+        rankTitle: 'Thám Hoa',
+        studentName: 'Tô Hải Đăng',
+        grade: 'Lớp 1A2',
+        score: 240,
+        maxScore: 300,
+        correctCount: 24,
+        totalQuestions: 30,
+        timeSpentSeconds: 1020,
+        completedAt: '25/11/2026, 18:10',
+        mode: 'practice',
+      },
+      {
+        id: 'sample-hs-08',
+        accountId: 'hs-08',
+        studentCode: 'SBD-2608',
+        roundTitle: 'Đề số 1: Đề Ôn Luyện TNTV Cấp Trường (Đề gốc PDF)',
+        rankTitle: 'Hoàng Giáp',
+        studentName: 'Đặng Anh Khôi',
+        grade: 'Lớp 1A2',
+        score: 190,
+        maxScore: 300,
+        correctCount: 19,
+        totalQuestions: 30,
+        timeSpentSeconds: 1120,
+        completedAt: '25/11/2026, 17:40',
         mode: 'practice',
       },
     ];
@@ -483,7 +545,13 @@ export default function App() {
             {currentUser ? (
               <button
                 type="button"
-                onClick={() => openAccountSection('profile')}
+                onClick={() =>
+                  openAccountSection(
+                    currentUser.role === 'teacher'
+                      ? 'teacher_monitor'
+                      : 'profile'
+                  )
+                }
                 className="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-teal-700 rounded-lg hover:bg-teal-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 {currentUser.fullName} ({currentUser.studentCode})
@@ -537,6 +605,7 @@ export default function App() {
             key={accountInitialTab}
             currentUser={currentUser}
             accounts={accounts}
+            examHistory={history}
             initialTab={accountInitialTab}
             onLoginSuccess={handleLoginSuccess}
             onRegisterSuccess={handleRegisterSuccess}
