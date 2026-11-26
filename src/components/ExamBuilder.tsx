@@ -502,14 +502,14 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         return;
       }
 
-      const { pageCount, rawText, usedOcr } = await extractTextFromPdfBuffer(
-        buffer,
-        (msg) => setPdfProgressMsg(msg)
-      );
+      const { pageCount, rawText, usedOcr, segments } =
+        await extractTextFromPdfBuffer(buffer, (msg) =>
+          setPdfProgressMsg(msg)
+        );
       setPdfPageCount(pageCount);
       setPdfRawText(rawText);
 
-      if (!rawText.trim()) {
+      if (!rawText.trim() && segments.length === 0) {
         setPdfParsedQuestions([]);
         setShowRawTextEditor(true);
         setPdfError(
@@ -518,7 +518,7 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
         return;
       }
 
-      const questions = parseVietnameseExamText(rawText);
+      const questions = parseVietnameseExamText(rawText, segments);
       setPdfParsedQuestions(questions);
       if (questions.length === 0) {
         setShowRawTextEditor(true);
@@ -1038,6 +1038,33 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
                         </button>
                       </div>
 
+                      {q.imageUrl && (
+                        <div className="flex items-start gap-3 p-2.5 rounded-lg bg-white border border-slate-200">
+                          <img
+                            src={q.imageUrl}
+                            alt={q.imageAlt || `Ảnh câu ${idx + 1}`}
+                            className="max-h-36 rounded-md border border-slate-200 object-contain bg-white"
+                          />
+                          <div className="flex flex-col gap-1.5 text-xs text-slate-500">
+                            <span className="font-semibold text-teal-800">
+                              Hình minh họa tự động cắt từ PDF
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdatePdfQuestion(idx, (old) => ({
+                                  ...old,
+                                  imageUrl: undefined,
+                                }))
+                              }
+                              className="self-start text-rose-600 hover:underline font-semibold cursor-pointer"
+                            >
+                              Bỏ hình ảnh này
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {q.type === 'mcq' && q.mcqOptions && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {q.mcqOptions.map((opt, optIdx) => {
@@ -1119,6 +1146,173 @@ export const ExamBuilder: React.FC<ExamBuilderProps> = ({
                           </div>
                         </div>
                       )}
+
+                      {q.type === 'dropdown' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="block font-semibold text-emerald-700 mb-1">
+                              Đáp án đúng:
+                            </label>
+                            <input
+                              type="text"
+                              value={q.correctTextAnswers?.[0] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdatePdfQuestion(idx, (old) => {
+                                  const opts = old.dropdownOptions
+                                    ? [...old.dropdownOptions]
+                                    : [];
+                                  if (val.trim() && !opts.includes(val.trim())) {
+                                    opts[0] = val.trim();
+                                  }
+                                  return {
+                                    ...old,
+                                    correctTextAnswers: [val],
+                                    dropdownOptions: opts,
+                                    explanation: `Đáp án đúng là "${val}".`,
+                                  };
+                                });
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-white text-sm font-bold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-slate-600 mb-1">
+                              Danh sách lựa chọn (cách nhau dấu phẩy):
+                            </label>
+                            <input
+                              type="text"
+                              value={(q.dropdownOptions || []).join(', ')}
+                              onChange={(e) => {
+                                const opts = e.target.value
+                                  .split(',')
+                                  .map((s) => s.trim())
+                                  .filter(Boolean);
+                                handleUpdatePdfQuestion(idx, (old) => ({
+                                  ...old,
+                                  dropdownOptions: opts,
+                                }));
+                              }}
+                              className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {q.type === 'matching' &&
+                        q.leftItems &&
+                        q.rightItems && (
+                          <div className="space-y-1.5 text-xs">
+                            <div className="font-semibold text-slate-600">
+                              Các cặp ghép tương ứng (Cột A ↔ Cột B):
+                            </div>
+                            {q.leftItems.map((left, pIdx) => {
+                              const pairedRightId = q.correctPairs?.[left.id];
+                              const right =
+                                q.rightItems?.find(
+                                  (r) => r.id === pairedRightId
+                                ) || q.rightItems?.[pIdx];
+                              return (
+                                <div
+                                  key={left.id}
+                                  className="grid grid-cols-2 gap-2"
+                                >
+                                  <input
+                                    type="text"
+                                    value={left.text || ''}
+                                    onChange={(e) =>
+                                      handleUpdatePdfQuestion(idx, (old) => ({
+                                        ...old,
+                                        leftItems: old.leftItems?.map((it) =>
+                                          it.id === left.id
+                                            ? { ...it, text: e.target.value }
+                                            : it
+                                        ),
+                                      }))
+                                    }
+                                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={right?.text || ''}
+                                    onChange={(e) => {
+                                      if (!right) return;
+                                      handleUpdatePdfQuestion(idx, (old) => ({
+                                        ...old,
+                                        rightItems: old.rightItems?.map((it) =>
+                                          it.id === right.id
+                                            ? { ...it, text: e.target.value }
+                                            : it
+                                        ),
+                                      }));
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                      {q.type === 'categorize' &&
+                        q.categories &&
+                        q.categorizeItems && (
+                          <div className="space-y-2 text-xs">
+                            <div className="font-semibold text-slate-600">
+                              Phân loại từ vào nhóm đúng:
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {q.categorizeItems.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200"
+                                >
+                                  <input
+                                    type="text"
+                                    value={item.text}
+                                    onChange={(e) =>
+                                      handleUpdatePdfQuestion(idx, (old) => ({
+                                        ...old,
+                                        categorizeItems:
+                                          old.categorizeItems?.map((it) =>
+                                            it.id === item.id
+                                              ? { ...it, text: e.target.value }
+                                              : it
+                                          ),
+                                      }))
+                                    }
+                                    className="flex-1 min-w-0 px-2 py-1 rounded border border-slate-200 text-xs font-semibold"
+                                  />
+                                  <select
+                                    value={item.correctGroupId}
+                                    onChange={(e) =>
+                                      handleUpdatePdfQuestion(idx, (old) => ({
+                                        ...old,
+                                        categorizeItems:
+                                          old.categorizeItems?.map((it) =>
+                                            it.id === item.id
+                                              ? {
+                                                  ...it,
+                                                  correctGroupId:
+                                                    e.target.value,
+                                                }
+                                              : it
+                                          ),
+                                      }))
+                                    }
+                                    className="px-2 py-1 rounded border border-teal-500 text-xs font-semibold text-teal-900 bg-teal-50"
+                                  >
+                                    {q.categories?.map((cat) => (
+                                      <option key={cat.id} value={cat.id}>
+                                        {cat.title}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                       {q.type === 'ordering' && (
                         <div className="text-xs">
