@@ -28,6 +28,8 @@ export interface CategorizeGroup {
 export interface CategorizeItem {
   id: string;
   text: string;
+  imageUrl?: string;
+  imageAlt?: string;
   correctGroupId: string;
 }
 
@@ -661,8 +663,13 @@ export function isQuestionAnswered(q: Question, ans: any): boolean {
     }
     case 'categorize': {
       if (typeof ans !== 'object') return false;
-      const totalItems = q.categorizeItems?.length || 0;
-      return Object.keys(ans).length === totalItems && totalItems > 0;
+      const requiredItems = (q.categorizeItems || []).filter(
+        (item) => item.correctGroupId !== ''
+      );
+      return (
+        Object.keys(ans).length >= requiredItems.length &&
+        requiredItems.length > 0
+      );
     }
     default:
       return false;
@@ -701,7 +708,11 @@ export function checkQuestionCorrect(q: Question, ans: any): boolean {
     }
     case 'categorize': {
       const items = q.categorizeItems || [];
-      return items.every((item) => ans[item.id] === item.correctGroupId);
+      return items.every((item) =>
+        item.correctGroupId === ''
+          ? !ans[item.id]
+          : ans[item.id] === item.correctGroupId
+      );
     }
     default:
       return false;

@@ -683,6 +683,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
       typeof answer === 'object' && answer !== null ? answer : {};
 
     const unassignedItems = items.filter((item) => !assignments[item.id]);
+    const hasDistractors = items.some((item) => item.correctGroupId === '');
 
     const handleAssignToGroup = (groupId: string) => {
       if (isSubmitted) return;
@@ -716,7 +717,12 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 bg-slate-50 px-4 py-2.5 rounded-lg border border-slate-200">
           <span>
-            Hướng dẫn: Nhấn chọn một từ ở kho bên dưới rồi nhấn vào hộp nhóm thích hợp (hoặc kéo thả từ vào nhóm).
+            Hướng dẫn: Nhấn chọn một thẻ ở kho bên dưới rồi nhấn vào hộp nhóm thích hợp (hoặc kéo thả vào nhóm).
+            {hasDistractors && (
+              <strong className="text-amber-700 ml-1">
+                Lưu ý: Những thẻ không thuộc nhóm nào thì để nguyên trên kho!
+              </strong>
+            )}
           </span>
           {!isSubmitted && Object.keys(assignments).length > 0 && (
             <button
@@ -733,19 +739,20 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
           )}
         </div>
 
-        {/* Word Bank */}
+        {/* Word / Image Bank */}
         <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
           <div className="text-xs font-semibold text-slate-500 mb-3">
-            Kho từ cần phân loại ({unassignedItems.length}/{items.length} từ chưa xếp):
+            Kho thẻ cần phân loại ({unassignedItems.length}/{items.length} thẻ trên kho):
           </div>
           <div className="flex flex-wrap gap-2.5 min-h-12 items-center">
             {unassignedItems.length === 0 ? (
               <span className="text-sm text-emerald-700 font-medium">
-                Tất cả các từ đã được xếp vào các nhóm bên dưới!
+                Tất cả các thẻ đã được xếp vào các nhóm bên dưới!
               </span>
             ) : (
               unassignedItems.map((item) => {
                 const isSelected = selectedWordId === item.id;
+                const hasImg = item.imageUrl && !imageErrors[`cat-${item.id}`];
                 return (
                   <button
                     key={item.id}
@@ -759,13 +766,26 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                     onClick={() =>
                       setSelectedWordId(isSelected ? null : item.id)
                     }
-                    className={`px-3.5 py-2 rounded-lg text-base font-semibold border-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`rounded-xl text-base font-semibold border-2 transition-all cursor-pointer shrink-0 ${
+                      hasImg ? 'p-2 flex flex-col items-center gap-1.5' : 'px-3.5 py-2 whitespace-nowrap'
+                    } ${
                       isSelected
                         ? 'bg-teal-600 text-white border-teal-600 ring-2 ring-teal-500/30'
                         : 'bg-white text-slate-800 border-slate-300 hover:border-teal-500'
                     }`}
                   >
-                    {item.text}
+                    {hasImg && (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.imageAlt || item.text}
+                        referrerPolicy="no-referrer"
+                        onError={() => handleImageError(`cat-${item.id}`)}
+                        className="w-24 h-20 object-contain rounded-lg bg-white border border-slate-200 p-1 pointer-events-none"
+                      />
+                    )}
+                    <span className={hasImg ? 'text-xs font-semibold' : ''}>
+                      {item.text}
+                    </span>
                   </button>
                 );
               })
@@ -774,7 +794,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
         </div>
 
         {/* Category Buckets Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {categories.map((cat) => {
             const groupItems = items.filter(
               (it) => assignments[it.id] === cat.id
@@ -802,7 +822,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                       {cat.title}
                     </span>
                     <span className="text-xs font-medium text-slate-500 tabular-nums">
-                      {groupItems.length} từ
+                      {groupItems.length} thẻ
                     </span>
                   </div>
 
@@ -810,12 +830,13 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                     {groupItems.length === 0 ? (
                       <span className="text-xs text-slate-400 italic py-4">
                         {selectedWordId
-                          ? 'Nhấn vào đây để đặt từ đang chọn vào nhóm này'
-                          : 'Chưa có từ nào trong nhóm này'}
+                          ? 'Nhấn vào đây để đặt thẻ đang chọn vào nhóm này'
+                          : 'Chưa có thẻ nào trong nhóm này'}
                       </span>
                     ) : (
                       groupItems.map((item) => {
                         const itemCorrect = item.correctGroupId === cat.id;
+                        const hasImg = item.imageUrl && !imageErrors[`cat-${item.id}`];
                         let chipStyle =
                           'bg-teal-50 border-teal-600 text-slate-900';
                         if (showFeedback) {
@@ -833,15 +854,24 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
                               e.stopPropagation();
                               handleUnassign(item.id);
                             }}
-                            title="Nhấn để đưa từ này trở lại kho"
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors cursor-pointer ${chipStyle}`}
+                            title="Nhấn để đưa thẻ này trở lại kho"
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm font-semibold transition-colors cursor-pointer ${chipStyle}`}
                           >
+                            {hasImg && (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.imageAlt || item.text}
+                                referrerPolicy="no-referrer"
+                                onError={() => handleImageError(`cat-${item.id}`)}
+                                className="w-12 h-10 object-contain rounded bg-white border border-slate-200 p-0.5"
+                              />
+                            )}
                             <span>{item.text}</span>
                             {showFeedback ? (
                               itemCorrect ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               ) : (
-                                <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                               )
                             ) : (
                               <span className="text-xs text-slate-400 hover:text-rose-600">
