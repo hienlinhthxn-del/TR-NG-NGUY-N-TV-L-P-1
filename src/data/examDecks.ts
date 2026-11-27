@@ -3117,6 +3117,662 @@ export const DECK_6_QUESTIONS: Question[] = [
   },
 ];
 
+// ============================================================================
+// Đề 4 Ôn Cấp Trường: Cấp Trường Vòng 3 (CẤP TRƯỜNG VÒNG 3.pdf)
+// Trích xuất đầy đủ 30 câu hỏi kèm hình ảnh từ tài liệu: CẤP TRƯỜNG VÒNG 3.pdf
+// ============================================================================
+export const DECK_7_QUESTIONS: Question[] = [
+  {
+    id: 701,
+    number: 1,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm',
+    points: 10,
+    prompt: 'Tiếng nào có vần "at"?',
+    mcqOptions: [
+      { id: 'A', text: 'mắt' },
+      { id: 'B', text: 'hạt' },
+      { id: 'C', text: 'tất' },
+      { id: 'D', text: 'mật' },
+    ],
+    correctMcqId: 'B',
+    explanation:
+      'Tiếng "hạt" có âm đầu "h", vần "at" và thanh nặng. Tiếng "mắt" có vần "ăt", còn "tất" và "mật" có vần "ât".',
+  },
+  {
+    id: 702,
+    number: 2,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm',
+    points: 10,
+    prompt: 'Từ ngữ nào dưới đây là tên một loài vật?',
+    mcqOptions: [
+      { id: 'A', text: 'bò sữa' },
+      { id: 'B', text: 'sữa chua' },
+      { id: 'C', text: 'giọt sữa' },
+      { id: 'D', text: 'sữa bò' },
+    ],
+    correctMcqId: 'A',
+    explanation:
+      '"Bò sữa" là tên một loài động vật nuôi cho sữa. Các đáp án còn lại chỉ thức ăn hoặc đồ uống từ sữa.',
+  },
+  {
+    id: 703,
+    number: 3,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm',
+    points: 10,
+    prompt: 'Tiếng nào có âm "kh"?',
+    mcqOptions: [
+      { id: 'A', text: 'chăn' },
+      { id: 'B', text: 'khăn' },
+      { id: 'C', text: 'nhẫn' },
+      { id: 'D', text: 'than' },
+    ],
+    correctMcqId: 'B',
+    explanation:
+      'Tiếng "khăn" có âm đầu là âm "kh" ghép với vần "ăn".',
+  },
+  {
+    id: 704,
+    number: 4,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm hình ảnh',
+    points: 10,
+    prompt: 'Đây là quả gì?',
+    imageUrl: '/assets/q_images/v3_q4_cachua.jpg',
+    imageAlt: 'Quả cà chua đỏ',
+    mcqOptions: [
+      { id: 'A', text: 'đu đủ' },
+      { id: 'B', text: 'cà chua' },
+      { id: 'C', text: 'bí đỏ' },
+      { id: 'D', text: 'vú sữa' },
+    ],
+    correctMcqId: 'B',
+    explanation:
+      'Hình minh họa là quả cà chua chín đỏ mọng.',
+  },
+  {
+    id: 705,
+    number: 5,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm hình ảnh',
+    points: 10,
+    prompt: 'Đây là con gì?',
+    imageUrl: '/assets/q_images/v3_q5_ga.jpg',
+    imageAlt: 'Con gà mái',
+    mcqOptions: [
+      { id: 'A', text: 'thỏ' },
+      { id: 'B', text: 'vẹt' },
+      { id: 'C', text: 'bò' },
+      { id: 'D', text: 'gà' },
+    ],
+    correctMcqId: 'D',
+    explanation:
+      'Hình minh họa là con gà mái.',
+  },
+  {
+    id: 706,
+    number: 6,
+    type: 'mcq',
+    typeLabel: 'Dấu thanh tiếng Việt',
+    points: 10,
+    prompt: 'Tiếng "vỗ" mang thanh gì?',
+    mcqOptions: [
+      { id: 'A', text: 'thanh ngã ( ~ )' },
+      { id: 'B', text: 'thanh nặng ( . )' },
+      { id: 'C', text: 'thanh sắc ( ´ )' },
+      { id: 'D', text: 'thanh huyền ( ` )' },
+    ],
+    correctMcqId: 'A',
+    explanation:
+      'Tiếng "vỗ" gồm âm đầu "v", âm chính "ô" và dấu thanh ngã ( ~ ).',
+  },
+  {
+    id: 707,
+    number: 7,
+    type: 'mcq',
+    typeLabel: 'Nhận diện vần chung',
+    points: 10,
+    prompt: 'Tên các đồ vật sau có chung vần gì?',
+    imageUrl: '/assets/q_images/v3_q7_danban.jpg',
+    imageAlt: 'Cây đàn ghi-ta và chiếc bàn gỗ',
+    mcqOptions: [
+      { id: 'A', text: 'vần "en"' },
+      { id: 'B', text: 'vần "an"' },
+      { id: 'C', text: 'vần "ăn"' },
+      { id: 'D', text: 'vần "ân"' },
+    ],
+    correctMcqId: 'B',
+    explanation:
+      'Hai đồ vật trong hình là cây "đàn" và cái "bàn". Cả hai tiếng "đàn" và "bàn" đều có chung vần "an".',
+  },
+  {
+    id: 708,
+    number: 8,
+    type: 'mcq',
+    typeLabel: 'Tìm câu chứa vần',
+    points: 10,
+    prompt: 'Câu nào dưới đây chứa tiếng có vần "ât"?',
+    mcqOptions: [
+      { id: 'A', text: 'Lan là cô bạn rất thật thà.' },
+      { id: 'B', text: 'Nhà An có chú vẹt nhỏ.' },
+      { id: 'C', text: 'Bố sửa tủ gỗ cho bà.' },
+      { id: 'D', text: 'Bố mẹ đưa Hà về quê ăn Tết.' },
+    ],
+    correctMcqId: 'A',
+    explanation:
+      'Trong câu "Lan là cô bạn rất thật thà.", hai tiếng "rất" và "thật" đều có chứa vần "ât".',
+  },
+  {
+    id: 709,
+    number: 9,
+    type: 'mcq',
+    typeLabel: 'Chính tả c / k',
+    points: 10,
+    prompt: 'Từ ngữ nào dưới đây viết sai chính tả?',
+    mcqOptions: [
+      { id: 'A', text: 'chữ kí' },
+      { id: 'B', text: 'kỉ vật' },
+      { id: 'C', text: 'kăn nhà' },
+      { id: 'D', text: 'kì lạ' },
+    ],
+    correctMcqId: 'C',
+    explanation:
+      '"Kăn nhà" viết sai chính tả vì đứng trước chữ "ă" phải dùng chữ "c" (viết đúng là "căn nhà"). Chữ "k" chỉ đứng trước i, e, ê.',
+  },
+  {
+    id: 710,
+    number: 10,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm hình ảnh',
+    points: 10,
+    prompt: 'Tên loài hoa nào có vần "en"?',
+    mcqOptions: [
+      {
+        id: 'A',
+        text: 'hoa đào',
+        imageUrl: '/assets/q_images/v3_q10_hoadao.jpg',
+        imageAlt: 'Hoa đào',
+      },
+      {
+        id: 'B',
+        text: 'hoa sữa',
+        imageUrl: '/assets/q_images/v3_q10_hoasua.jpg',
+        imageAlt: 'Hoa sữa',
+      },
+      {
+        id: 'C',
+        text: 'hoa sen',
+        imageUrl: '/assets/q_images/v3_q10_hoasen.jpg',
+        imageAlt: 'Hoa sen',
+      },
+    ],
+    correctMcqId: 'C',
+    explanation:
+      'Hình C là "hoa sen", tiếng "sen" có chứa vần "en".',
+  },
+  {
+    id: 711,
+    number: 11,
+    type: 'mcq',
+    typeLabel: 'Đọc thơ tìm vần',
+    points: 10,
+    prompt: 'Đáp án nào chỉ gồm các vần xuất hiện trong khổ thơ sau?',
+    subPrompt:
+      'Mẹ làm món cá kho\nCho bữa trưa cả nhà\nKho kèm quả me ta\nVị đậm đà ngon quá.\n(Hạ An)',
+    mcqOptions: [
+      { id: 'A', text: 'âm, em, an, ot' },
+      { id: 'B', text: 'âm, em, ôm, ân' },
+      { id: 'C', text: 'âm, em, ăm, ot' },
+      { id: 'D', text: 'âm, em, am, on' },
+    ],
+    correctMcqId: 'D',
+    explanation:
+      'Trong khổ thơ có tiếng "đậm" (vần "âm"), tiếng "kèm" (vần "em"), tiếng "làm" (vần "am"), và tiếng "món" / "ngon" (vần "on"). Vậy đáp án đúng là D: âm, em, am, on.',
+  },
+  {
+    id: 712,
+    number: 12,
+    type: 'mcq',
+    typeLabel: 'Trắc nghiệm hình ảnh',
+    points: 10,
+    prompt: 'Tên con vật nào dưới đây có vần "ên"?',
+    mcqOptions: [
+      {
+        id: 'A',
+        text: 'con nhím',
+        imageUrl: '/assets/q_images/v3_q12_nhim.jpg',
+        imageAlt: 'Con nhím',
+      },
+      {
+        id: 'B',
+        text: 'con cá sấu',
+        imageUrl: '/assets/q_images/v3_q12_casau.jpg',
+        imageAlt: 'Con cá sấu',
+      },
+      {
+        id: 'C',
+        text: 'con nhện',
+        imageUrl: '/assets/q_images/v3_q12_nhen.jpg',
+        imageAlt: 'Con nhện',
+      },
+      {
+        id: 'D',
+        text: 'con gián',
+        imageUrl: '/assets/q_images/v3_q12_gian.jpg',
+        imageAlt: 'Con gián',
+      },
+    ],
+    correctMcqId: 'C',
+    explanation:
+      'Hình C là "con nhện", tiếng "nhện" có chứa vần "ên".',
+  },
+  {
+    id: 713,
+    number: 13,
+    type: 'mcq',
+    typeLabel: 'Giải câu đố',
+    points: 10,
+    prompt: 'Giải câu đố:',
+    subPrompt:
+      'Quả gì ngon ngọt, hạt đen\nMở mắt là chín, thơm trên lá cành?',
+    mcqOptions: [
+      { id: 'A', text: 'quả dưa' },
+      { id: 'B', text: 'quả dừa' },
+      { id: 'C', text: 'quả na' },
+      { id: 'D', text: 'quả khế' },
+    ],
+    correctMcqId: 'C',
+    explanation:
+      'Quả na khi chín các mắt na nở to ("mở mắt là chín"), thịt trắng ngọt thơm và có hạt màu đen.',
+  },
+  {
+    id: 714,
+    number: 14,
+    type: 'mcq',
+    typeLabel: 'Quan sát hình ảnh',
+    points: 10,
+    prompt: 'Câu nào dưới đây mô tả đúng đoạn phim / hình ảnh sau?',
+    imageUrl: '/assets/q_images/v3_q14_bosua.jpg',
+    imageAlt: 'Đàn bò sữa đang ăn cỏ xanh',
+    mcqOptions: [
+      { id: 'A', text: 'Đàn dê ngủ trên bờ đê.' },
+      { id: 'B', text: 'Đàn bò sữa ăn cỏ.' },
+      { id: 'C', text: 'Đàn ngựa đi trên đê.' },
+    ],
+    correctMcqId: 'B',
+    explanation:
+      'Hình ảnh mô tả đàn bò sữa có bộ lông khoang đen trắng đang gặm cỏ xanh trên đồng.',
+  },
+  {
+    id: 715,
+    number: 15,
+    type: 'mcq',
+    typeLabel: 'Giải câu đố',
+    points: 10,
+    prompt: 'Giải câu đố:',
+    subPrompt:
+      'Con gì ra rả mùa hè\nRâm ran như hát, bạn bè tạm xa?',
+    mcqOptions: [
+      { id: 'A', text: 'con gián' },
+      { id: 'B', text: 'con ve' },
+      { id: 'C', text: 'con dế' },
+      { id: 'D', text: 'con nhện' },
+    ],
+    correctMcqId: 'B',
+    explanation:
+      'Con ve sầu kêu râm ran trên cành cây báo hiệu mùa hè đến và các bạn học sinh nghỉ hè tạm xa nhau.',
+  },
+  {
+    id: 716,
+    number: 16,
+    type: 'fill_text',
+    typeLabel: 'Điền vần en / an',
+    points: 10,
+    prompt: 'Điền vần "en" hoặc "an" thích hợp vào hai chỗ trống sau (theo thứ tự):',
+    subPrompt: 'đan x[...]   |   s[...] sẻ',
+    sentenceBefore: 'Thứ tự hai vần cần điền là: ',
+    sentenceAfter: '.',
+    hintOptions: ['en - an', 'an - en'],
+    correctTextAnswers: ['en - an', 'en, an', 'en an', 'en/an'],
+    explanation:
+      'Chỗ trống thứ nhất điền vần "en" để được từ "đan xen"; chỗ trống thứ hai điền vần "an" để được từ "san sẻ".',
+  },
+  {
+    id: 717,
+    number: 17,
+    type: 'fill_text',
+    typeLabel: 'Đếm chữ cái trong tranh',
+    points: 10,
+    prompt: 'Điền số thích hợp vào chỗ trống sau:',
+    imageUrl: '/assets/q_images/v3_q17_chua.jpg',
+    imageAlt: 'Tranh các chữ cái nhiều màu sắc tìm chữ ă',
+    sentenceBefore: 'Trong hình trên có tất cả ',
+    sentenceAfter: ' chữ "ă".',
+    hintOptions: ['2', '3', '4', '5'],
+    correctTextAnswers: ['3'],
+    explanation:
+      'Quan sát kĩ bức tranh: Có 3 chữ "ă" (1 chữ "ă" màu xanh lá ở góc trên bên trái dưới chữ h, 1 chữ "ă" màu đỏ ở phía dưới gần chữ đ và m, và 1 chữ "ă" màu đỏ cam ở bên phải cạnh chữ h).',
+  },
+  {
+    id: 718,
+    number: 18,
+    type: 'fill_text',
+    typeLabel: 'Nhận diện vần chung',
+    points: 10,
+    prompt: 'Điền vần thích hợp vào chỗ trống sau:',
+    sentenceBefore: 'Các tiếng "ngan, bạn, giàn" có chung vần ',
+    sentenceAfter: '.',
+    hintOptions: ['an', 'ăn', 'ân', 'en'],
+    correctTextAnswers: ['an'],
+    explanation:
+      'Cả 3 tiếng "ngan, bạn, giàn" đều có chung vần "an".',
+  },
+  {
+    id: 719,
+    number: 19,
+    type: 'fill_text',
+    typeLabel: 'Chính tả c / k',
+    points: 10,
+    prompt: 'Điền "c" hoặc "k" thích hợp vào chỗ trống trong câu mô tả hình ảnh sau:',
+    imageUrl: '/assets/q_images/v3_q19_bocat.jpg',
+    imageAlt: 'Bố dắt con đi trên bờ cát',
+    sentenceBefore: 'Bố dắt con đi trên bờ ',
+    sentenceAfter: 'át.',
+    hintOptions: ['c', 'k'],
+    correctTextAnswers: ['c'],
+    explanation:
+      'Đứng trước vần "at" (át), ta viết chữ "c" để tạo thành từ "bờ cát".',
+  },
+  {
+    id: 720,
+    number: 20,
+    type: 'fill_text',
+    typeLabel: 'Chính tả ng / ngh',
+    points: 10,
+    prompt: 'Điền "ng" hoặc "ngh" thích hợp vào chỗ trống trong câu mô tả hình ảnh sau:',
+    subPrompt: 'Cô ca sĩ hát [...]ân [...]a.',
+    imageUrl: '/assets/q_images/v3_q20_casi.jpg',
+    imageAlt: 'Cô ca sĩ hát ngân nga',
+    sentenceBefore: 'Cô ca sĩ hát ',
+    sentenceAfter: 'ân nga.',
+    hintOptions: ['ng', 'ngh'],
+    correctTextAnswers: ['ng', 'ng - ng', 'ng, ng'],
+    explanation:
+      'Trước vần "ân" và âm "a", ta đều điền chữ "ng" để được từ "ngân nga": "Cô ca sĩ hát ngân nga."',
+  },
+  {
+    id: 721,
+    number: 21,
+    type: 'fill_text',
+    typeLabel: 'Chính tả c / k',
+    points: 10,
+    prompt: 'Điền "c" hoặc "k" thích hợp vào chỗ trống sau:',
+    imageUrl: '/assets/q_images/v3_q21_kem.jpg',
+    imageAlt: 'Que kem mát lạnh',
+    sentenceBefore: 'Tớ là que ',
+    sentenceAfter: 'em. Tớ có vị ngọt, ăn rất mát.',
+    hintOptions: ['c', 'k'],
+    correctTextAnswers: ['k'],
+    explanation:
+      'Đứng trước âm "e" (vần "em"), ta phải viết chữ "k" để tạo thành từ "que kem".',
+  },
+  {
+    id: 722,
+    number: 22,
+    type: 'matching',
+    typeLabel: 'Ghép hình với từ',
+    points: 10,
+    prompt: 'Hãy ghép hình ảnh với từ tương ứng.',
+    leftItems: [
+      {
+        id: 'L1',
+        imageUrl: '/assets/q_images/v3_q22_nho.jpg',
+        imageAlt: 'Chùm nho tím',
+        text: 'Hình chùm nho',
+      },
+      {
+        id: 'L2',
+        imageUrl: '/assets/q_images/v3_q22_cam.jpg',
+        imageAlt: 'Quả cam vàng',
+        text: 'Hình quả cam',
+      },
+      {
+        id: 'L3',
+        imageUrl: '/assets/q_images/v3_q22_mit.jpg',
+        imageAlt: 'Quả mít xanh',
+        text: 'Hình quả mít',
+      },
+    ],
+    rightItems: [
+      { id: 'R1', text: 'cam' },
+      { id: 'R2', text: 'nho' },
+      { id: 'R3', text: 'mít' },
+    ],
+    correctPairs: {
+      L1: 'R2',
+      L2: 'R1',
+      L3: 'R3',
+    },
+    explanation:
+      'Hình 1 là chùm nho (ghép với "nho"); Hình 2 là quả cam (ghép với "cam"); Hình 3 là quả mít (ghép với "mít").',
+  },
+  {
+    id: 723,
+    number: 23,
+    type: 'matching',
+    typeLabel: 'Ghép tiếng tạo từ',
+    points: 10,
+    prompt: 'Hãy ghép các tiếng ở hai vế để tạo thành từ đúng.',
+    leftItems: [
+      { id: 'L1', text: 'quan' },
+      { id: 'L2', text: 'hỗ' },
+      { id: 'L3', text: 'chia' },
+    ],
+    rightItems: [
+      { id: 'R1', text: 'tâm' },
+      { id: 'R2', text: 'trợ' },
+      { id: 'R3', text: 'sẻ' },
+    ],
+    correctPairs: {
+      L1: 'R1',
+      L2: 'R2',
+      L3: 'R3',
+    },
+    explanation:
+      'Ghép các tiếng ở hai vế ta được 3 từ có nghĩa: quan tâm, hỗ trợ, chia sẻ.',
+  },
+  {
+    id: 724,
+    number: 24,
+    type: 'matching',
+    typeLabel: 'Ghép vần với loại quả',
+    points: 10,
+    prompt: 'Hãy ghép vần với tên loại quả trong hình chứa vần tương ứng:',
+    leftItems: [
+      {
+        id: 'L1',
+        imageUrl: '/assets/q_images/v3_q24_am.jpg',
+        imageAlt: 'Thẻ vần am',
+        text: 'am',
+      },
+      {
+        id: 'L2',
+        imageUrl: '/assets/q_images/v3_q24_an.jpg',
+        imageAlt: 'Thẻ vần an',
+        text: 'an',
+      },
+      {
+        id: 'L3',
+        imageUrl: '/assets/q_images/v3_q24_om.jpg',
+        imageAlt: 'Thẻ vần ôm',
+        text: 'ôm',
+      },
+    ],
+    rightItems: [
+      {
+        id: 'R1',
+        imageUrl: '/assets/q_images/v3_q24_nhan.jpg',
+        imageAlt: 'Quả nhãn',
+        text: 'Quả nhãn',
+      },
+      {
+        id: 'R2',
+        imageUrl: '/assets/q_images/v3_q24_cam.jpg',
+        imageAlt: 'Quả cam',
+        text: 'Quả cam',
+      },
+      {
+        id: 'R3',
+        imageUrl: '/assets/q_images/v3_q24_chomchom.jpg',
+        imageAlt: 'Quả chôm chôm',
+        text: 'Quả chôm chôm',
+      },
+    ],
+    correctPairs: {
+      L1: 'R2',
+      L2: 'R1',
+      L3: 'R3',
+    },
+    explanation:
+      '• Vần "am" ghép với hình quả cam (tiếng "cam" có vần "am").\n• Vần "an" ghép với hình quả nhãn (tiếng "nhãn" có vần "an").\n• Vần "ôm" ghép với hình quả chôm chôm (tiếng "chôm" có vần "ôm").',
+  },
+  {
+    id: 725,
+    number: 25,
+    type: 'matching',
+    typeLabel: 'Ghép hình với câu mô tả',
+    points: 10,
+    prompt: 'Hãy ghép hình ảnh với câu mô tả tương ứng.',
+    leftItems: [
+      {
+        id: 'L1',
+        imageUrl: '/assets/q_images/v3_q25_omba.jpg',
+        imageAlt: 'Bé ôm bà',
+        text: 'Hình bé ôm bà',
+      },
+      {
+        id: 'L2',
+        imageUrl: '/assets/q_images/v3_q25_choan.jpg',
+        imageAlt: 'Mẹ đút cho bé ăn',
+        text: 'Hình mẹ cho bé ăn',
+      },
+      {
+        id: 'L3',
+        imageUrl: '/assets/q_images/v3_q25_kema.jpg',
+        imageAlt: 'Bé kề má mẹ',
+        text: 'Hình bé kề má mẹ',
+      },
+    ],
+    rightItems: [
+      { id: 'R1', text: 'Bé kề má mẹ.' },
+      { id: 'R2', text: 'Bé ôm bà.' },
+      { id: 'R3', text: 'Mẹ cho bé ăn.' },
+    ],
+    correctPairs: {
+      L1: 'R2',
+      L2: 'R3',
+      L3: 'R1',
+    },
+    explanation:
+      'Hình 1: Bé ôm bà.\nHình 2: Mẹ cho bé ăn.\nHình 3: Bé kề má mẹ.',
+  },
+  {
+    id: 726,
+    number: 26,
+    type: 'categorize',
+    typeLabel: 'Phân loại tiếng theo vần',
+    points: 10,
+    prompt: 'Em hãy xếp các từ vào nhóm thích hợp.',
+    categories: [
+      { id: 'van_an', title: 'Có vần "an"' },
+      { id: 'van_an2', title: 'Có vần "ăn"' },
+      { id: 'van_an3', title: 'Có vần "ân"' },
+    ],
+    categorizeItems: [
+      { id: 't1', text: 'thân', correctGroupId: 'van_an3' },
+      { id: 't2', text: 'cân', correctGroupId: 'van_an3' },
+      { id: 't3', text: 'sân', correctGroupId: 'van_an3' },
+      { id: 't4', text: 'nhận', correctGroupId: 'van_an3' },
+      { id: 't5', text: 'ván', correctGroupId: 'van_an' },
+      { id: 't6', text: 'lặn', correctGroupId: 'van_an2' },
+      { id: 't7', text: 'chắn', correctGroupId: 'van_an2' },
+      { id: 't8', text: 'màn', correctGroupId: 'van_an' },
+      { id: 't9', text: 'rắn', correctGroupId: 'van_an2' },
+      { id: 't10', text: 'bàn', correctGroupId: 'van_an' },
+      { id: 't11', text: 'dặn', correctGroupId: 'van_an2' },
+      { id: 't12', text: 'can', correctGroupId: 'van_an' },
+    ],
+    explanation:
+      '• Có vần "an": ván, màn, bàn, can.\n• Có vần "ăn": lặn, chắn, rắn, dặn.\n• Có vần "ân": thân, cân, sân, nhận.',
+  },
+  {
+    id: 727,
+    number: 27,
+    type: 'categorize',
+    typeLabel: 'Phân loại tiếng theo vần',
+    points: 10,
+    prompt: 'Em hãy xếp các từ vào nhóm thích hợp.',
+    categories: [
+      { id: 'van_et', title: 'Có vần "et"' },
+      { id: 'van_et2', title: 'Có vần "êt"' },
+    ],
+    categorizeItems: [
+      { id: 'e1', text: 'mệt', correctGroupId: 'van_et2' },
+      { id: 'e2', text: 'nét', correctGroupId: 'van_et' },
+      { id: 'e3', text: 'hết', correctGroupId: 'van_et2' },
+      { id: 'e4', text: 'vẹt', correctGroupId: 'van_et' },
+      { id: 'e5', text: 'tết', correctGroupId: 'van_et2' },
+      { id: 'e6', text: 'vết', correctGroupId: 'van_et2' },
+      { id: 'e7', text: 'khét', correctGroupId: 'van_et' },
+      { id: 'e8', text: 'sét', correctGroupId: 'van_et' },
+    ],
+    explanation:
+      '• Có vần "et": nét, vẹt, khét, sét.\n• Có vần "êt": mệt, hết, tết, vết.',
+  },
+  {
+    id: 728,
+    number: 28,
+    type: 'ordering',
+    typeLabel: 'Thứ tự bảng chữ cái',
+    points: 10,
+    prompt: 'Sắp xếp tên các bạn dưới đây theo đúng thứ tự trong bảng chữ cái.',
+    orderingTokens: ['Hà', 'An', 'Vân', 'Lan'],
+    correctOrder: ['An', 'Hà', 'Lan', 'Vân'],
+    orderingJoiner: ' → ',
+    explanation:
+      'Dựa vào chữ cái đầu của mỗi tên (A → H → L → V), thứ tự đúng trong bảng chữ cái là: An → Hà → Lan → Vân.',
+  },
+  {
+    id: 729,
+    number: 29,
+    type: 'ordering',
+    typeLabel: 'Sắp xếp tiếng thành câu',
+    points: 10,
+    prompt: 'Sắp xếp các tiếng sau thành câu hoàn chỉnh.',
+    orderingTokens: ['đi', 'trên', 'vỉa', 'hè.', 'Bé'],
+    correctOrder: ['Bé', 'đi', 'trên', 'vỉa', 'hè.'],
+    orderingJoiner: ' ',
+    explanation:
+      'Sắp xếp các tiếng theo đúng ngữ pháp ta được câu: "Bé đi trên vỉa hè."',
+  },
+  {
+    id: 730,
+    number: 30,
+    type: 'ordering',
+    typeLabel: 'Sắp xếp chữ thành từ',
+    points: 10,
+    prompt: 'Sắp xếp các chữ sau thành từ chỉ nghề nghiệp.',
+    orderingTokens: ['s', 'C', 'a', 'ĩ'],
+    correctOrder: ['C', 'a', 's', 'ĩ'],
+    orderingJoiner: '',
+    orderingDisplayOverrides: { Casĩ: 'Ca sĩ' },
+    explanation:
+      'Ghép các chữ cái theo thứ tự C - a - s - ĩ ta được từ chỉ nghề nghiệp: "Ca sĩ".',
+  },
+];
+
 export const BUILTIN_EXAM_DECKS: ExamDeck[] = [
   {
     id: 'deck-official-pdf',
@@ -3146,8 +3802,17 @@ export const BUILTIN_EXAM_DECKS: ExamDeck[] = [
     questions: DECK_4_QUESTIONS,
   },
   {
+    id: 'deck-school-vong3',
+    title: 'Đề số 4: Đề 4 Ôn Cấp Trường - Cấp Trường Vòng 3 (30 câu)',
+    subtitle: 'Bộ đề 30 câu trích xuất đầy đủ từ file CẤP TRƯỜNG VÒNG 3.pdf',
+    durationMinutes: 30,
+    passingScore: 150,
+    createdAt: 'Đề chuẩn PDF mới',
+    questions: DECK_7_QUESTIONS,
+  },
+  {
     id: 'deck-school-day2-b',
-    title: 'Đề số 4: Đề Thi Cấp Trường Lớp 1 - Ngày 2 (Đề B)',
+    title: 'Đề số 5: Đề Thi Cấp Trường Lớp 1 - Ngày 2 (Đề B)',
     subtitle: 'Bộ đề 30 câu biến thể từ file Vòng Cấp Trường Lớp 1 - Ngày 2 (TNTV 1.pdf)',
     durationMinutes: 30,
     passingScore: 150,
@@ -3156,7 +3821,7 @@ export const BUILTIN_EXAM_DECKS: ExamDeck[] = [
   },
   {
     id: 'deck-doc1-phonics',
-    title: 'Đề số 5: Đề Ôn Luyện Âm Vần & Chính Tả Lớp 1 (Đề Doc1)',
+    title: 'Đề số 6: Đề Ôn Luyện Âm Vần & Chính Tả Lớp 1 (Đề Doc1)',
     subtitle: 'Bộ đề 30 câu trắc nghiệm & điền từ trích xuất từ file Doc1.pdf',
     durationMinutes: 30,
     passingScore: 150,
@@ -3165,7 +3830,7 @@ export const BUILTIN_EXAM_DECKS: ExamDeck[] = [
   },
   {
     id: 'deck-school-2',
-    title: 'Đề số 6: Đề Thi Thử Cấp Trường Mở Rộng',
+    title: 'Đề số 7: Đề Thi Thử Cấp Trường Mở Rộng',
     subtitle: '30 câu hỏi tổng hợp luyện âm vần, chính tả c/k, ng/ngh, tục ngữ & câu đố',
     durationMinutes: 30,
     passingScore: 180,
@@ -3175,7 +3840,7 @@ export const BUILTIN_EXAM_DECKS: ExamDeck[] = [
 ];
 
 /**
- * Hàm sinh đề thi mới tự động từ Ngân hàng 180 câu hỏi chuẩn (6 bộ đề)
+ * Hàm sinh đề thi mới tự động từ Ngân hàng 210 câu hỏi chuẩn (7 bộ đề)
  * Cho phép lọc theo các dạng bài, chọn số lượng câu (10, 15, 20, 30 câu),
  * xáo trộn thứ tự câu hỏi và đánh lại số thứ tự từ Câu 1 -> Câu N.
  */
@@ -3192,6 +3857,7 @@ export function generateRandomizedDeck(options: {
     ...DECK_4_QUESTIONS,
     ...DECK_5_QUESTIONS,
     ...DECK_6_QUESTIONS,
+    ...DECK_7_QUESTIONS,
     ...DECK_2_QUESTIONS,
   ];
   const filteredPool = allPool.filter((q) =>
